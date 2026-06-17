@@ -69,6 +69,13 @@ const icons = {
       <line x1="22" y1="11" x2="16" y2="11" />
     </svg>
   ),
+  poster: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <polyline points="21 15 16 10 5 21" />
+    </svg>
+  ),
 };
 
 
@@ -82,6 +89,7 @@ const navItems = [
   { to: '/MsDigiGold', label: 'DigiGold', icon: 'digi' },
   { to: '/attendance', label: 'Attendance', icon: 'attendance' },
   { to: '/employee-setup', label: 'Employee Setup', icon: 'empsetup' },
+  { to: '/poster-create', label: 'Poster Creator', icon: 'poster' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
 
@@ -95,6 +103,7 @@ const pageTitles = {
   salesorders: 'Sales Orders',
   msdigigold: 'DigiGold',
   settings: 'Settings',
+  'poster-create': 'Poster Creator',
 };
 
 function Layout() {

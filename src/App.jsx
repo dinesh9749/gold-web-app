@@ -9,13 +9,11 @@ import CustomerView from './pages/CustomerView';
 import SalesOrders from './pages/SalesOrders';
 import MsDigiGold from './pages/MsDigiGold';
 import Settings from './pages/Settings';
-import Rateinput from './pages/Rateinput'
-import Receipt from './pages/Receipt'
-import Attendance from './pages/Attendance'
-import EmployeeSetup from './pages/EmployeeSetup'
-
-
-
+import Rateinput from './pages/Rateinput';
+import Receipt from './pages/Receipt';
+import Attendance from './pages/Attendance';
+import EmployeeSetup from './pages/EmployeeSetup';
+import PosterCreate from './pages/PosterCreate';
 
 function App() {
   return (
@@ -25,22 +23,20 @@ function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="Invoice" element={<Invoice />} />
-
           <Route path="Receipt" element={<Receipt />} />
           <Route path="rateinput" element={<Rateinput />} />
           <Route path="customerview" element={<CustomerView />} />
           <Route path="SalesOrders" element={<SalesOrders />} />
           <Route path="MsDigiGold" element={<MsDigiGold />} />
-          <Route path="settings" element={<Settings />} />
           <Route path="attendance" element={<Attendance />} />
           <Route path="employee-setup" element={<EmployeeSetup />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="poster-create" element={<PosterCreate />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
-
-
         </Route>
       </Routes>
     </Router>
   );
 }
 
-export default App;
+export default App;
