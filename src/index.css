@@ -816,3 +816,124 @@ body {
   color: var(--gold-300);
   font-weight: 500;
 }
+
+/* ============================================================
+   RESPONSIVENESS (MOBILE FRIENDLY)
+   ============================================================ */
+
+/* Base style for mobile menu button (hidden on desktop) */
+.mobile-menu-btn {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* 1. LAYOUT & SIDEBAR COLLAPSE */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: -240px;
+    z-index: 1000;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+  }
+
+  .app-layout.sidebar-open .sidebar {
+    left: 0;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(2px);
+    z-index: 999;
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .mobile-menu-btn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    color: var(--text-primary);
+    cursor: pointer;
+    margin-right: 8px;
+  }
+
+  .topbar {
+    padding: 0 16px;
+  }
+
+  .topbar-badge {
+    display: none !important;
+  }
+
+  .page-content {
+    padding: 12px !important;
+    overflow-x: hidden;
+  }
+
+  /* 2. AUTO-STACK INLINE GRIDS */
+  div[style*="grid-template-columns"],
+  div[style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* 3. AUTO-STACK INLINE FLEXES (Dashboard & Cards) */
+  /* Stack Rate Cards on mobile */
+  div:has(> .rate-card) {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  
+  .rate-card {
+    width: 100% !important;
+  }
+
+  /* Stack Hero Date/Time bar on mobile */
+  div:has(> .clock-display) {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 16px !important;
+  }
+
+  /* Stack Summary Bar on mobile */
+  div:has(> .clock-display) + div:has(> .rate-card) + div,
+  div[style*="Per Gram Today"],
+  div[style*="per gram today"] {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 16px !important;
+  }
+
+  /* 4. SCROLLABLE DATA TABLES */
+  div:has(> .data-table) {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+  }
+
+  .data-table {
+    min-width: 600px !important;
+  }
+  
+  /* 5. FORM LAYOUT ADJUSTMENTS */
+  .modal-box {
+    padding: 16px !important;
+    max-height: 95vh;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

@@ -102,6 +102,8 @@ function Layout() {
   const currentPath = location.pathname.split('/')[1]?.toLowerCase();
   const pageTitle = pageTitles[currentPath] || 'Dashboard';
 
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   const [isAdmin, setIsAdmin] = useState(() => {
     return localStorage.getItem("goldApp_adminMode") !== "false";
   });
@@ -149,7 +151,15 @@ function Layout() {
   const managementMenu = navItems.slice(4).filter(item => isAdmin || item.to.toLowerCase() !== '/settings');
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout ${isMobileSidebarOpen ? 'sidebar-open' : ''}`}>
+      {/* Mobile Sidebar Backdrop Overlay */}
+      {isMobileSidebarOpen && (
+        <div 
+          className="sidebar-backdrop" 
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* ── SIDEBAR ─────────────────────────────────────────── */}
       <aside className="sidebar">
         {/* Logo */}
@@ -171,6 +181,7 @@ function Layout() {
               key={item.to}
               to={item.to}
               className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+              onClick={() => setIsMobileSidebarOpen(false)}
             >
               <span className="nav-link-icon">{icons[item.icon]}</span>
               {item.label}
@@ -183,6 +194,7 @@ function Layout() {
               key={item.to}
               to={item.to}
               className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+              onClick={() => setIsMobileSidebarOpen(false)}
             >
               <span className="nav-link-icon">{icons[item.icon]}</span>
               {item.label}
@@ -227,6 +239,15 @@ function Layout() {
         {/* Top bar */}
         <header className="topbar">
           <div className="topbar-title">
+            <button
+              onClick={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+              className="mobile-menu-btn"
+              title="Toggle Menu"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 20, height: 20 }}>
+                <path d="M3 12h18M3 6h18M3 18h18" />
+              </svg>
+            </button>
             <span className="topbar-title-dot" />
             {pageTitle}
           </div>
