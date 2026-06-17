@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Verify that keys exist, are valid HTTP urls, and are not the default placeholder text
 const isConfigured = !!(
   supabaseUrl && 
   supabaseUrl.startsWith('http') && 
@@ -21,33 +20,31 @@ if (!isConfigured) {
   );
 }
 
-// Resilient fallback client to prevent the React app from crashing on start
+// Helper function to create a Proxy that acts like a Promise and handles any chained method calls
+const createMockPromise = () => {
+  const promise = Promise.resolve({ data: [], error: null });
+  const handler = {
+    get: (target, prop) => {
+      if (prop === 'then') return target.then.bind(target);
+      if (prop === 'catch') return target.catch.bind(target);
+      // For any chained query method (e.g. .order(), .limit(), .eq()), return a new proxy promise
+      return () => createMockPromise();
+    }
+  };
+  return new Proxy(promise, handler);
+};
+
+// Resilient fallback client using ES6 Proxies to handle any Supabase query builders transparently
 export const supabase = isConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : {
-      from: () => ({
-        select: () => ({
-          order: () => ({
-            limit: () => Promise.resolve({ data: [], error: null }),
-            order: () => Promise.resolve({ data: [], error: null }),
-          }),
-          eq: () => Promise.resolve({ data: [], error: null }),
-          like: () => Promise.resolve({ data: [], error: null }),
-          or: () => ({
-            order: () => Promise.resolve({ data: [], error: null })
-          })
-        }),
-        insert: () => ({
-          select: () => Promise.resolve({ data: [{ id: 1 }], error: null })
-        }),
-        update: () => ({
-          eq: () => Promise.resolve({ data: [], error: null })
-        }),
-        delete: () => ({
-          eq: () => Promise.resolve({ data: [], error: null })
-        }),
-        upsert: () => ({
-          select: () => Promise.resolve({ data: [{ id: 1 }], error: null })
-        })
-      })
+      from: () => {
+        const handler = {
+          get: (target, prop) => {
+            // Intercept calls like .select(), .insert(), .upsert() and return a chainable mock promise
+            return () => createMockPromise();
+          }
+        };
+        return new Proxy({}, handler);
+      }
     };
