@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 
 // Default Gold Logo SVG
-const DefaultLogoSVG = () => (
+const DefaultLogoSVG = ({ color }) => (
   <svg viewBox="0 0 100 100" width="48" height="48" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
     <defs>
       <linearGradient id="logo-gold" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -11,20 +11,20 @@ const DefaultLogoSVG = () => (
         <stop offset="100%" stopColor="#b45309" />
       </linearGradient>
     </defs>
-    <circle cx="50" cy="50" r="45" fill="none" stroke="url(#logo-gold)" strokeWidth="1.5" />
-    <circle cx="50" cy="50" r="40" fill="none" stroke="url(#logo-gold)" strokeWidth="0.5" strokeDasharray="3" />
-    <path d="M32 65V35l18 16l18-16v30" fill="none" stroke="url(#logo-gold)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M38 52h24" fill="none" stroke="url(#logo-gold)" strokeWidth="1.5" opacity="0.5" />
+    <circle cx="50" cy="50" r="45" fill="none" stroke={color || "url(#logo-gold)"} strokeWidth="1.5" />
+    <circle cx="50" cy="50" r="40" fill="none" stroke={color || "url(#logo-gold)"} strokeWidth="0.5" strokeDasharray="3" />
+    <path d="M32 65V35l18 16l18-16v30" fill="none" stroke={color || "url(#logo-gold)"} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M38 52h24" fill="none" stroke={color || "url(#logo-gold)"} strokeWidth="1.5" opacity="0.5" />
   </svg>
 );
 
-// Vector Gold Earrings SVG (Default for Template A)
+// Vector Gold Earrings SVG (Default Product)
 const DefaultEarringSVG = () => (
   <svg viewBox="0 0 200 200" width="100%" height="100%">
     <defs>
       <radialGradient id="box-grad" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stopColor="#fefefe" />
-        <stop offset="100%" stopColor="#ebe7de" />
+        <stop offset="0%" stopColor="#fdfdfd" />
+        <stop offset="100%" stopColor="#e5e0d5" />
       </radialGradient>
       <radialGradient id="earring-gold" cx="50%" cy="50%" r="50%">
         <stop offset="0%" stopColor="#fff9c4" />
@@ -32,72 +32,134 @@ const DefaultEarringSVG = () => (
         <stop offset="100%" stopColor="#b45309" />
       </radialGradient>
       <filter id="svg-shadow" x="-15%" y="-15%" width="130%" height="130%">
-        <feDropShadow dx="0" dy="8" stdDeviation="6" floodColor="#000" floodOpacity="0.16" />
+        <feDropShadow dx="0" dy="6" stdDeviation="5" floodColor="#000" floodOpacity="0.2" />
       </filter>
     </defs>
-    <rect x="20" y="20" width="160" height="160" rx="24" fill="url(#box-grad)" filter="url(#svg-shadow)" stroke="#ffffff" strokeWidth="2.5" />
-    <rect x="30" y="30" width="140" height="140" rx="16" fill="none" stroke="#dce1e5" strokeWidth="1" strokeDasharray="3" />
-    <path d="M45 100h110" stroke="#d5d0c3" strokeWidth="3" strokeLinecap="round" opacity="0.5" />
+    <rect x="25" y="25" width="150" height="150" rx="22" fill="url(#box-grad)" filter="url(#svg-shadow)" stroke="#ffffff" strokeWidth="2" />
+    <rect x="34" y="34" width="132" height="132" rx="14" fill="none" stroke="#d5dbe0" strokeWidth="1" strokeDasharray="3" />
+    <path d="M48 100h104" stroke="#d2ccbe" strokeWidth="2.5" strokeLinecap="round" opacity="0.5" />
     
-    {/* Left Earring */}
-    <g transform="translate(68, 95)" filter="url(#svg-shadow)">
-      <circle cx="0" cy="0" r="10" fill="url(#earring-gold)" />
-      <path d="M0 0 L-14 -14 A10 10 0 1 1 14 -14 Z" fill="url(#earring-gold)" />
-      <circle cx="0" cy="-20" r="4" fill="#ffffff" />
-      <circle cx="0" cy="0" r="3" fill="#ffffff" />
+    <g transform="translate(72, 95)" filter="url(#svg-shadow)">
+      <circle cx="0" cy="0" r="9" fill="url(#earring-gold)" />
+      <path d="M0 0 L-12 -12 A9 9 0 1 1 12 -12 Z" fill="url(#earring-gold)" />
+      <circle cx="0" cy="-18" r="3.5" fill="#ffffff" />
+      <circle cx="0" cy="0" r="2.5" fill="#ffffff" />
     </g>
     
-    {/* Right Earring */}
-    <g transform="translate(132, 95)" filter="url(#svg-shadow)">
-      <circle cx="0" cy="0" r="10" fill="url(#earring-gold)" />
-      <path d="M0 0 L-14 -14 A10 10 0 1 1 14 -14 Z" fill="url(#earring-gold)" />
-      <circle cx="0" cy="-20" r="4" fill="#ffffff" />
-      <circle cx="0" cy="0" r="3" fill="#ffffff" />
+    <g transform="translate(128, 95)" filter="url(#svg-shadow)">
+      <circle cx="0" cy="0" r="9" fill="url(#earring-gold)" />
+      <path d="M0 0 L-12 -12 A9 9 0 1 1 12 -12 Z" fill="url(#earring-gold)" />
+      <circle cx="0" cy="-18" r="3.5" fill="#ffffff" />
+      <circle cx="0" cy="0" r="2.5" fill="#ffffff" />
     </g>
   </svg>
 );
 
-// Vector Gold Ring SVG (Default for Template B)
-const DefaultRingSVG = () => (
-  <svg viewBox="0 0 200 200" width="100%" height="100%">
-    <defs>
-      <linearGradient id="gold-band" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#fffbeb" />
-        <stop offset="30%" stopColor="#fbbf24" />
-        <stop offset="70%" stopColor="#d97706" />
-        <stop offset="100%" stopColor="#78350f" />
-      </linearGradient>
-      <filter id="ring-glow" x="-20%" y="-20%" width="140%" height="140%">
-        <feDropShadow dx="3" dy="12" stdDeviation="8" floodColor="#000" floodOpacity="0.3" />
-      </filter>
-    </defs>
-    <ellipse cx="100" cy="115" rx="72" ry="12" fill="#000000" opacity="0.18" filter="blur(4px)" />
-    <g filter="url(#ring-glow)">
-      <ellipse cx="100" cy="100" rx="66" ry="66" fill="none" stroke="url(#gold-band)" strokeWidth="20" />
-      <ellipse cx="100" cy="100" rx="55" ry="55" fill="none" stroke="#fff" strokeWidth="2" opacity="0.25" />
-      {/* Decorative inner cuts */}
-      <path d="M52 52 A66 66 0 0 1 148 52" fill="none" stroke="#ffffff" strokeWidth="4" strokeLinecap="round" opacity="0.5" />
-      <path d="M52 148 A66 66 0 0 0 148 148" fill="none" stroke="#000000" strokeWidth="4" strokeLinecap="round" opacity="0.15" />
-    </g>
-  </svg>
-);
+const presetBgs = {
+  champagne: {
+    name: 'Champagne Satin',
+    style: { background: 'radial-gradient(circle at 60% 40%, #ffffff 0%, #f7f3e8 45%, #e6dfcf 100%)' }
+  },
+  emerald: {
+    name: 'Emerald Velvet',
+    style: { background: 'radial-gradient(circle at 30% 30%, #064e3b 0%, #022c22 70%, #011c15 100%)' }
+  },
+  ruby: {
+    name: 'Royal Ruby Satin',
+    style: { background: 'radial-gradient(circle at 30% 30%, #7f1d1d 0%, #450a0a 75%, #2d0505 100%)' }
+  },
+  midnight: {
+    name: 'Midnight Gold Dust',
+    style: { background: 'radial-gradient(circle at 50% 30%, #1c1c28 0%, #0b0b10 70%, #050508 100%)' }
+  },
+  rose: {
+    name: 'Rose Gold Silk',
+    style: { background: 'radial-gradient(circle at 30% 30%, #fff1f2 0%, #ffe4e6 45%, #fecdd3 100%)' }
+  },
+  ivory: {
+    name: 'Classic Ivory Marble',
+    style: { background: 'linear-gradient(135deg, #fdfbf7 0%, #f5f0e6 100%)' }
+  },
+  sapphire: {
+    name: 'Sapphire Silk',
+    style: { background: 'radial-gradient(circle at 30% 30%, #1e3a8a 0%, #172554 75%, #0f172a 100%)' }
+  },
+  obsidian: {
+    name: 'Obsidian Black',
+    style: { background: 'linear-gradient(180deg, #161616 0%, #080808 100%)' }
+  }
+};
+
+const colorThemes = {
+  lightGold: {
+    textColor: '#3d3016',
+    accentColor: '#b59345',
+    cardBg: 'rgba(255, 255, 255, 0.55)',
+    cardBorder: '1px solid rgba(181, 147, 69, 0.3)'
+  },
+  darkGold: {
+    textColor: '#fffbeb',
+    accentColor: '#fbbf24',
+    cardBg: 'rgba(22, 22, 30, 0.65)',
+    cardBorder: '1px solid rgba(251, 191, 36, 0.25)'
+  },
+  silverSlate: {
+    textColor: '#f8f8ff',
+    accentColor: '#94a3b8',
+    cardBg: 'rgba(15, 23, 42, 0.65)',
+    cardBorder: '1px solid rgba(148, 163, 184, 0.25)'
+  }
+};
 
 export default function PosterCreate() {
+  // Input states
   const [goldRate, setGoldRate] = useState(13800);
   const [silverRate, setSilverRate] = useState(260);
   const [dateStr, setDateStr] = useState('');
   const [locationStr, setLocationStr] = useState('Srivilliputtur, Dhalavaipuram');
   const [phoneStr, setPhoneStr] = useState('Ph - 9443112034, 9345100001');
-  const [activeTemplate, setActiveTemplate] = useState('A');
+
+  // Background states
+  const [bgType, setBgType] = useState('preset'); // 'preset' or 'upload'
+  const [selectedPreset, setSelectedPreset] = useState('champagne');
+  const [uploadedBg, setUploadedBg] = useState(null);
+
+  // Logo & Jewelry assets
   const [logoImg, setLogoImg] = useState(null);
   const [jewelryImg, setJewelryImg] = useState(null);
+
+  // Styling properties
+  const [textColor, setTextColor] = useState('#3d3016');
+  const [accentColor, setAccentColor] = useState('#b59345');
+  const [cardBg, setCardBg] = useState('rgba(255, 255, 255, 0.55)');
+  const [cardBorder, setCardBorder] = useState('1px solid rgba(181, 147, 69, 0.3)');
+
+  // Coordinate Positioning states (percentages)
+  const [logoY, setLogoY] = useState(15);
+  const [logoX, setLogoX] = useState(65);
+  const [logoScale, setLogoScale] = useState(1);
+
+  const [productY, setProductY] = useState(26);
+  const [productX, setProductX] = useState(24);
+  const [productScale, setProductScale] = useState(1);
+  const [showProduct, setShowProduct] = useState(true);
+
+  const [titleY, setTitleY] = useState(48);
+  const [titleScale, setTitleScale] = useState(1);
+
+  const [ratesY, setRatesY] = useState(72);
+  const [ratesScale, setRatesScale] = useState(1);
+
+  const [footerY, setFooterY] = useState(92);
+
+  // App UI states
+  const [activeTab, setActiveTab] = useState('bg'); // 'bg' | 'rates' | 'position' | 'assets'
   const [isCapturing, setIsCapturing] = useState(false);
   const [errorText, setErrorText] = useState('');
   const [successText, setSuccessText] = useState('');
 
   const posterRef = useRef(null);
 
-  // Initialize date as DD.MM.YYYY
   useEffect(() => {
     const today = new Date();
     const dd = String(today.getDate()).padStart(2, '0');
@@ -105,7 +167,7 @@ export default function PosterCreate() {
     const yyyy = today.getFullYear();
     setDateStr(`${dd}.${mm}.${yyyy}`);
 
-    // Try to load current rates from Supabase database
+    // Fetch current rates from local sqlite cache via supabase if connected
     const loadCurrentRates = async () => {
       try {
         if (window.electronAPI && typeof window.electronAPI.getMetalRates === 'function') {
@@ -122,6 +184,29 @@ export default function PosterCreate() {
     };
     loadCurrentRates();
   }, []);
+
+  // Quick theme setter
+  const applyTheme = (themeName) => {
+    const theme = colorThemes[themeName];
+    if (theme) {
+      setTextColor(theme.textColor);
+      setAccentColor(theme.accentColor);
+      setCardBg(theme.cardBg);
+      setCardBorder(theme.cardBorder);
+    }
+  };
+
+  const handleBgUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setUploadedBg(reader.result);
+        setBgType('upload');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleLogoUpload = (e) => {
     const file = e.target.files[0];
@@ -151,29 +236,27 @@ export default function PosterCreate() {
       const element = posterRef.current;
       if (!element) throw new Error('Preview canvas element not found');
 
-      // Temporarily remove transform scaling if browser is rendering scaled down
-      const originalStyle = element.style.transform;
+      // Temporary reset transforms for html2canvas to draw standard dimensions correctly
+      const originalTransform = element.style.transform;
       element.style.transform = 'none';
 
-      // Wait a moment for layout reflow
       await new Promise(r => setTimeout(r, 100));
 
       const canvas = await html2canvas(element, {
         useCORS: true,
-        scale: 2, // 2x scale for high resolution
+        scale: 2.5, // 2.5x scaling for high print resolution (1350x1687px output)
         backgroundColor: null,
         logging: false,
       });
 
-      // Restore original transform scaling
-      element.style.transform = originalStyle;
+      element.style.transform = originalTransform;
 
       const imgData = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.href = imgData;
       link.download = `Gold_Rate_Poster_${dateStr.replace(/\./g, '-')}.png`;
       link.click();
-      setSuccessText('Poster downloaded successfully!');
+      setSuccessText('Poster exported and downloaded successfully!');
     } catch (err) {
       console.error(err);
       setErrorText('Failed to download image. Try again.');
@@ -184,9 +267,13 @@ export default function PosterCreate() {
 
   const gold8gValue = (goldRate * 8).toLocaleString('en-IN');
 
+  const canvasStyle = bgType === 'upload' && uploadedBg
+    ? { backgroundImage: `url(${uploadedBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : presetBgs[selectedPreset].style;
+
   return (
-    <div style={{ padding: '4px 0', minHeight: '100%' }}>
-      {/* Load luxury Google Fonts dynamically */}
+    <div style={{ padding: '2px 0', minHeight: '100%' }}>
+      {/* Load Google Serif/Decorative Fonts */}
       <style dangerouslySetInnerHTML={{ __html: `
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Bodoni+Moda:ital,wght@0,400;0,600;1,400&display=swap');
         
@@ -201,18 +288,59 @@ export default function PosterCreate() {
           font-family: 'Bodoni Moda', serif;
         }
 
-        .poster-creator-container {
+        .studio-layout {
           display: grid;
-          grid-template-columns: 360px 1fr;
+          grid-template-columns: 380px 1fr;
           gap: 24px;
           align-items: start;
         }
 
-        @media (max-width: 900px) {
-          .poster-creator-container {
+        .studio-tab-btn {
+          flex: 1;
+          padding: 8px 4px;
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          background: var(--bg-secondary);
+          color: var(--text-secondary);
+          border: 1px solid var(--border-subtle);
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+
+        .studio-tab-btn.active {
+          border-color: var(--gold-400);
+          color: var(--gold-300);
+          background: rgba(251, 191, 36, 0.08);
+        }
+
+        .slider-row {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          margin-bottom: 12px;
+        }
+
+        .slider-row label {
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--text-secondary);
+          display: flex;
+          justify-content: space-between;
+        }
+
+        .slider-row input[type="range"] {
+          width: 100%;
+          accent-color: var(--gold-400);
+          cursor: pointer;
+        }
+
+        @media (max-width: 960px) {
+          .studio-layout {
             grid-template-columns: 1fr !important;
           }
-          .poster-preview-wrapper {
+          .canvas-wrapper {
             justify-content: center !important;
           }
         }
@@ -220,157 +348,268 @@ export default function PosterCreate() {
 
       <div className="section-header">
         <div>
-          <h2 className="section-title">Daily Rate Poster Creator</h2>
-          <p className="section-sub">Generate premium social media images for WhatsApp, Facebook, or Instagram status</p>
+          <h2 className="section-title">Interactive Poster Studio</h2>
+          <p className="section-sub">Create infinite designs by uploading custom background templates and dragging/sliding text blocks.</p>
         </div>
       </div>
 
       {successText && <div className="toast toast-success">{successText}</div>}
       {errorText && <div className="toast toast-error">{errorText}</div>}
 
-      <div className="poster-creator-container">
+      <div className="studio-layout">
         
-        {/* ── LEFT PANEL: CONTROLS ───────────────────────────── */}
+        {/* ── LEFT PANEL: CONFIGURATION & SLIDERS ──────────────── */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: 10 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--gold-300)' }}>Poster Settings</h3>
+          
+          {/* Tab Navigation */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className={`studio-tab-btn ${activeTab === 'bg' ? 'active' : ''}`} onClick={() => setActiveTab('bg')}>Template</button>
+            <button className={`studio-tab-btn ${activeTab === 'rates' ? 'active' : ''}`} onClick={() => setActiveTab('rates')}>Rates</button>
+            <button className={`studio-tab-btn ${activeTab === 'position' ? 'active' : ''}`} onClick={() => setActiveTab('position')}>Layout</button>
+            <button className={`studio-tab-btn ${activeTab === 'assets' ? 'active' : ''}`} onClick={() => setActiveTab('assets')}>Uploads</button>
           </div>
 
-          {/* Template Selection */}
-          <div>
-            <label className="form-label">Select Template Style</label>
-            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-              <button 
-                type="button" 
-                className={`btn-secondary ${activeTemplate === 'A' ? 'active' : ''}`}
-                style={{ flex: 1, borderColor: activeTemplate === 'A' ? 'var(--gold-400)' : '', color: activeTemplate === 'A' ? 'var(--gold-300)' : '' }}
-                onClick={() => setActiveTemplate('A')}
-              >
-                Satin Velvet (Style A)
-              </button>
-              <button 
-                type="button" 
-                className={`btn-secondary ${activeTemplate === 'B' ? 'active' : ''}`}
-                style={{ flex: 1, borderColor: activeTemplate === 'B' ? 'var(--gold-400)' : '', color: activeTemplate === 'B' ? 'var(--gold-300)' : '' }}
-                onClick={() => setActiveTemplate('B')}
-              >
-                Royal Marble (Style B)
-              </button>
-            </div>
-          </div>
+          <div style={{ minHeight: 330 }}>
+            {/* ── TAB 1: BACKGROUND & THEME ── */}
+            {activeTab === 'bg' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <label className="form-label">Background Template</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button 
+                    className={`btn-secondary ${bgType === 'preset' ? 'active' : ''}`}
+                    style={{ flex: 1, padding: 6, fontSize: 12 }}
+                    onClick={() => setBgType('preset')}
+                  >
+                    Built-in Presets
+                  </button>
+                  <button 
+                    className={`btn-secondary ${bgType === 'upload' ? 'active' : ''}`}
+                    style={{ flex: 1, padding: 6, fontSize: 12 }}
+                    onClick={() => setBgType('upload')}
+                  >
+                    Custom Upload
+                  </button>
+                </div>
 
-          {/* Manual Rate Inputs */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label className="form-label">Gold Rate (1g)</label>
-              <input 
-                type="number" 
-                className="form-input" 
-                value={goldRate} 
-                onChange={e => setGoldRate(parseFloat(e.target.value) || 0)} 
-              />
-            </div>
-            <div>
-              <label className="form-label">Silver Rate (1g)</label>
-              <input 
-                type="number" 
-                className="form-input" 
-                value={silverRate} 
-                onChange={e => setSilverRate(parseFloat(e.target.value) || 0)} 
-              />
-            </div>
-          </div>
+                {bgType === 'preset' ? (
+                  <div>
+                    <label className="form-label" style={{ fontSize: 10 }}>Select Preset Texture</label>
+                    <select 
+                      className="form-select" 
+                      value={selectedPreset} 
+                      onChange={e => setSelectedPreset(e.target.value)}
+                    >
+                      {Object.entries(presetBgs).map(([key, bg]) => (
+                        <option key={key} value={key}>{bg.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="form-label" style={{ fontSize: 10 }}>Upload Background Template</label>
+                    <input type="file" accept="image/*" className="form-input" onChange={handleBgUpload} />
+                  </div>
+                )}
 
-          {/* Date, Location, Contact */}
-          <div>
-            <label className="form-label">Date Display</label>
-            <input 
-              type="text" 
-              className="form-input" 
-              value={dateStr} 
-              onChange={e => setDateStr(e.target.value)} 
-            />
-          </div>
+                {/* Color Schemes */}
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10 }}>
+                  <label className="form-label">Quick Color Schemes</label>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                    <button type="button" className="btn-secondary" style={{ flex: 1, padding: '4px 8px', fontSize: 11 }} onClick={() => applyTheme('lightGold')}>Gold & Ivory</button>
+                    <button type="button" className="btn-secondary" style={{ flex: 1, padding: '4px 8px', fontSize: 11 }} onClick={() => applyTheme('darkGold')}>Gold & Black</button>
+                    <button type="button" className="btn-secondary" style={{ flex: 1, padding: '4px 8px', fontSize: 11 }} onClick={() => applyTheme('silverSlate')}>Silver Theme</button>
+                  </div>
+                </div>
 
-          <div>
-            <label className="form-label">Location Text</label>
-            <input 
-              type="text" 
-              className="form-input" 
-              value={locationStr} 
-              onChange={e => setLocationStr(e.target.value)} 
-            />
-          </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: 9 }}>Text Color</label>
+                    <input type="color" className="form-input" style={{ padding: '4px 8px', height: 38 }} value={textColor} onChange={e => setTextColor(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: 9 }}>Accent Color</label>
+                    <input type="color" className="form-input" style={{ padding: '4px 8px', height: 38 }} value={accentColor} onChange={e => setAccentColor(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            )}
 
-          <div>
-            <label className="form-label">Contact / Phone Numbers</label>
-            <input 
-              type="text" 
-              className="form-input" 
-              value={phoneStr} 
-              onChange={e => setPhoneStr(e.target.value)} 
-            />
-          </div>
+            {/* ── TAB 2: MANUAL RATES & META ── */}
+            {activeTab === 'rates' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label className="form-label">Gold Rate (1g)</label>
+                    <input type="number" className="form-input" value={goldRate} onChange={e => setGoldRate(parseFloat(e.target.value) || 0)} />
+                  </div>
+                  <div>
+                    <label className="form-label">Silver Rate (1g)</label>
+                    <input type="number" className="form-input" value={silverRate} onChange={e => setSilverRate(parseFloat(e.target.value) || 0)} />
+                  </div>
+                </div>
 
-          {/* File Uploaders */}
-          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 14 }}>
-            <label className="form-label" style={{ marginBottom: 4 }}>Custom Logo (Optional)</label>
-            <input 
-              type="file" 
-              accept="image/*" 
-              className="form-input" 
-              style={{ fontSize: 12, padding: '6px 10px' }} 
-              onChange={handleLogoUpload} 
-            />
-            {logoImg && (
-              <button 
-                className="btn-danger" 
-                style={{ marginTop: 6, width: '100%', padding: 4 }} 
-                onClick={() => setLogoImg(null)}
-              >
-                Reset Logo
-              </button>
+                <div>
+                  <label className="form-label">Date Display</label>
+                  <input type="text" className="form-input" value={dateStr} onChange={e => setDateStr(e.target.value)} />
+                </div>
+
+                <div>
+                  <label className="form-label">Location Address</label>
+                  <input type="text" className="form-input" value={locationStr} onChange={e => setLocationStr(e.target.value)} />
+                </div>
+
+                <div>
+                  <label className="form-label">Contact / Phone Numbers</label>
+                  <input type="text" className="form-input" value={phoneStr} onChange={e => setPhoneStr(e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            {/* ── TAB 3: LAYOUT POSITIONING SLIDERS ── */}
+            {activeTab === 'position' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {/* Logo positions */}
+                <div className="slider-row">
+                  <label>Logo Vertical position <span>{logoY}%</span></label>
+                  <input type="range" min="5" max="95" value={logoY} onChange={e => setLogoY(parseInt(e.target.value))} />
+                </div>
+                <div className="slider-row">
+                  <label>Logo Horizontal position <span>{logoX}%</span></label>
+                  <input type="range" min="5" max="95" value={logoX} onChange={e => setLogoX(parseInt(e.target.value))} />
+                </div>
+                <div className="slider-row">
+                  <label>Logo Size Scale <span>x{logoScale.toFixed(2)}</span></label>
+                  <input type="range" min="0.5" max="2.0" step="0.05" value={logoScale} onChange={e => setLogoScale(parseFloat(e.target.value))} />
+                </div>
+
+                {/* Product positions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <input type="checkbox" id="showProductBox" checked={showProduct} onChange={e => setShowProduct(e.target.checked)} style={{ accentColor: 'var(--gold-400)' }} />
+                  <label htmlFor="showProductBox" className="form-label" style={{ margin: 0, cursor: 'pointer' }}>Show Product Image / Slot</label>
+                </div>
+                {showProduct && (
+                  <>
+                    <div className="slider-row">
+                      <label>Product Vertical position <span>{productY}%</span></label>
+                      <input type="range" min="5" max="95" value={productY} onChange={e => setProductY(parseInt(e.target.value))} />
+                    </div>
+                    <div className="slider-row">
+                      <label>Product Horizontal position <span>{productX}%</span></label>
+                      <input type="range" min="5" max="95" value={productX} onChange={e => setProductX(parseInt(e.target.value))} />
+                    </div>
+                    <div className="slider-row">
+                      <label>Product Size Scale <span>x{productScale.toFixed(2)}</span></label>
+                      <input type="range" min="0.5" max="2.0" step="0.05" value={productScale} onChange={e => setProductScale(parseFloat(e.target.value))} />
+                    </div>
+                  </>
+                )}
+
+                {/* Title & Rates positions */}
+                <div className="slider-row" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10 }}>
+                  <label>Title Banner vertical position <span>{titleY}%</span></label>
+                  <input type="range" min="5" max="95" value={titleY} onChange={e => setTitleY(parseInt(e.target.value))} />
+                </div>
+                <div className="slider-row">
+                  <label>Title Banner Scale <span>x{titleScale.toFixed(2)}</span></label>
+                  <input type="range" min="0.5" max="2.0" step="0.05" value={titleScale} onChange={e => setTitleScale(parseFloat(e.target.value))} />
+                </div>
+
+                <div className="slider-row" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10 }}>
+                  <label>Rates Card vertical position <span>{ratesY}%</span></label>
+                  <input type="range" min="5" max="95" value={ratesY} onChange={e => setRatesY(parseInt(e.target.value))} />
+                </div>
+                <div className="slider-row">
+                  <label>Rates Card Scale <span>x{ratesScale.toFixed(2)}</span></label>
+                  <input type="range" min="0.5" max="2.0" step="0.05" value={ratesScale} onChange={e => setRatesScale(parseFloat(e.target.value))} />
+                </div>
+
+                {/* Footer positions */}
+                <div className="slider-row" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 10 }}>
+                  <label>Footer details Y-position <span>{footerY}%</span></label>
+                  <input type="range" min="80" max="98" value={footerY} onChange={e => setFooterY(parseInt(e.target.value))} />
+                </div>
+              </div>
+            )}
+
+            {/* ── TAB 4: FILE UPLOADS (LOGO & JEWELRY) ── */}
+            {activeTab === 'assets' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label className="form-label">Custom Logo Image (Optional)</label>
+                  <input type="file" accept="image/*" className="form-input" style={{ fontSize: 12, padding: '6px 10px' }} onChange={handleLogoUpload} />
+                  {logoImg && (
+                    <button type="button" className="btn-danger" style={{ marginTop: 6, width: '100%', padding: 4 }} onClick={() => setLogoImg(null)}>Clear Custom Logo</button>
+                  )}
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
+                  <label className="form-label">Custom Jewelry Image (Optional)</label>
+                  <input type="file" accept="image/*" className="form-input" style={{ fontSize: 12, padding: '6px 10px' }} onChange={handleJewelryUpload} />
+                  {jewelryImg && (
+                    <button type="button" className="btn-danger" style={{ marginTop: 6, width: '100%', padding: 4 }} onClick={() => setJewelryImg(null)}>Clear Custom Photo</button>
+                  )}
+                </div>
+
+                {/* Opacity slider for cards */}
+                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
+                  <label className="form-label">Rates Container Fill Style</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 8 }}>
+                    <input 
+                      type="color" 
+                      className="form-input" 
+                      style={{ padding: '4px 8px', height: 38 }} 
+                      value={cardBg.startsWith('rgba') ? '#ffffff' : cardBg} 
+                      onChange={e => {
+                        const col = e.target.value;
+                        // Keep opacity, change color
+                        setCardBg(`rgba(${parseInt(col.slice(1,3),16)}, ${parseInt(col.slice(3,5),16)}, ${parseInt(col.slice(5,7),16)}, 0.55)`);
+                      }} 
+                    />
+                    <select 
+                      className="form-select" 
+                      onChange={e => {
+                        const op = e.target.value;
+                        // Replace opacity value
+                        setCardBg(prev => {
+                          if (prev.startsWith('rgba')) {
+                            const rgb = prev.substring(5, prev.lastIndexOf(','));
+                            return `rgba(${rgb}, ${op})`;
+                          }
+                          return prev;
+                        });
+                      }}
+                    >
+                      <option value="0.75">Solid Fill (75%)</option>
+                      <option value="0.55" selected>Medium Blur (55%)</option>
+                      <option value="0.30">Light Blur (30%)</option>
+                      <option value="0.0">No Fill (0%)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
-          <div>
-            <label className="form-label" style={{ marginBottom: 4 }}>Custom Jewelry Image (Optional)</label>
-            <input 
-              type="file" 
-              accept="image/*" 
-              className="form-input" 
-              style={{ fontSize: 12, padding: '6px 10px' }} 
-              onChange={handleJewelryUpload} 
-            />
-            {jewelryImg && (
-              <button 
-                className="btn-danger" 
-                style={{ marginTop: 6, width: '100%', padding: 4 }} 
-                onClick={() => setJewelryImg(null)}
-              >
-                Reset Jewelry Photo
-              </button>
-            )}
+          {/* Export Button */}
+          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 12 }}>
+            <button 
+              type="button" 
+              className="btn-primary" 
+              style={{ width: '100%', justifyContent: 'center', height: 42 }} 
+              onClick={handleDownload}
+              disabled={isCapturing}
+            >
+              {isCapturing ? 'Saving Poster...' : '📥 Export Poster PNG'}
+            </button>
           </div>
-
-          {/* Download Button */}
-          <button 
-            type="button" 
-            className="btn-primary" 
-            style={{ width: '100%', marginTop: 8, justifyContent: 'center', height: 42 }} 
-            onClick={handleDownload}
-            disabled={isCapturing}
-          >
-            {isCapturing ? 'Generating Poster...' : '📥 Download Poster PNG'}
-          </button>
         </div>
 
-        {/* ── RIGHT PANEL: LIVE PREVIEW CANVAS ────────────────── */}
-        <div className="poster-preview-wrapper" style={{ display: 'flex', justifyContent: 'flex-start', overflow: 'auto', padding: '10px 0' }}>
+        {/* ── RIGHT PANEL: LIVE STUDIO CANVAS ────────────────── */}
+        <div className="canvas-wrapper" style={{ display: 'flex', justifyContent: 'flex-start', overflow: 'auto', padding: '10px 0' }}>
           
           {/* 
-            The actual Canvas wrapper is sized at 540x675 (exactly 50% scale of 1080x1350 for sharp rendering).
-            This maintains standard proportions while avoiding a massive window inside the app.
+            Fixed high-resolution layout size (540x675px) matches standard portrait ratio.
+            We scale elements inside absolute layouts using translation offsets.
           */}
           <div 
             ref={posterRef}
@@ -383,289 +622,245 @@ export default function PosterCreate() {
               position: 'relative',
               borderRadius: 4,
               overflow: 'hidden',
-              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)',
-              background: '#ffffff',
-              display: 'flex',
-              flexDirection: 'column',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.45)',
               boxSizing: 'border-box',
+              ...canvasStyle
             }}
           >
-            {activeTemplate === 'A' ? (
-              // ── STYLE A: CLASSIC SATIN VELVET ──────────────────
-              <div style={{
-                width: '100%',
-                height: '100%',
-                background: 'radial-gradient(circle at 60% 40%, #ffffff 0%, #f7f3e8 45%, #e6dfcf 100%)',
-                padding: '34px 28px',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                color: '#4a3f29',
-                boxSizing: 'border-box',
-                position: 'relative'
-              }}>
-                {/* Decorative subtle leaves corner vectors */}
-                <div style={{ position: 'absolute', top: 10, left: 10, fontSize: 18, opacity: 0.25 }}>🍂</div>
-                <div style={{ position: 'absolute', bottom: 10, right: 10, fontSize: 18, opacity: 0.25 }}>🍂</div>
-
-                {/* Top header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  {/* Left: Product Showcase */}
-                  <div style={{ width: 170, height: 170, borderRadius: 16, overflow: 'hidden' }}>
-                    {jewelryImg ? (
-                      <img src={jewelryImg} alt="Jewelry Item" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <DefaultEarringSVG />
-                    )}
-                  </div>
-
-                  {/* Right: Brand Header */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, textAlign: 'center', paddingLeft: 10 }}>
-                    <div style={{ marginBottom: 6 }}>
-                      {logoImg ? (
-                        <img src={logoImg} alt="Logo" style={{ maxHeight: 52, objectFit: 'contain' }} />
-                      ) : (
-                        <DefaultLogoSVG />
-                      )}
-                    </div>
-                    <div className="poster-font-title" style={{ fontSize: 20, fontWeight: 700, color: '#3d3016', lineHeight: 1 }}>MSGOLD</div>
-                    <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: 2, color: '#786235', marginTop: 4, textTransform: 'uppercase', borderTop: '0.5px solid #dcd1ba', borderBottom: '0.5px solid #dcd1ba', padding: '2px 8px' }}>
-                      Since 1930
-                    </div>
-                    <div style={{ fontSize: 6, letterSpacing: 1.5, color: '#968055', textTransform: 'uppercase', marginTop: 3 }}>
-                      Trusted for Generations
-                    </div>
-                  </div>
-                </div>
-
-                {/* Today's rate banner */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, margin: '14px 0' }}>
-                  <div className="poster-font-serif" style={{ fontSize: 28, fontStyle: 'italic', fontWeight: 600, color: '#b59345', textShadow: '0 1px 1px #fff', lineHeight: 1 }}>
-                    Today's
-                  </div>
-                  <div className="poster-font-title" style={{ fontSize: 34, fontWeight: 800, color: '#3d3016', lineHeight: 1, letterSpacing: 2 }}>
-                    GOLD RATE
-                  </div>
-                  <div style={{
-                    border: '1.5px solid #d4c5a3',
-                    borderRadius: 20,
-                    padding: '3px 26px',
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: '#3d3016',
-                    background: 'rgba(255,255,255,0.4)',
-                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)',
-                  }}>
-                    {dateStr}
-                  </div>
-                </div>
-
-                {/* Bottom Rates Grid */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  
-                  {/* Gram row cards */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                    {/* Gold card */}
-                    <div style={{
-                      background: 'linear-gradient(180deg, #ffffff 0%, #fdfcf9 100%)',
-                      border: '1px solid #e2d7be',
-                      borderRadius: 14,
-                      padding: '10px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      boxShadow: '0 4px 10px rgba(74, 63, 41, 0.05)'
-                    }}>
-                      <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #fce089, #d4a32c)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#4a3605', border: '1.5px stroke #fff' }}>Au</div>
-                      <div>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: '#8c7d5f', textTransform: 'uppercase', letterSpacing: 0.5 }}>Gold Rate (1g)</div>
-                        <div className="poster-font-serif" style={{ fontSize: 18, fontWeight: 700, color: '#3d3016' }}>₹{goldRate.toLocaleString('en-IN')}</div>
-                      </div>
-                    </div>
-
-                    {/* Silver card */}
-                    <div style={{
-                      background: 'linear-gradient(180deg, #ffffff 0%, #fdfcf9 100%)',
-                      border: '1px solid #e2d7be',
-                      borderRadius: 14,
-                      padding: '10px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      boxShadow: '0 4px 10px rgba(74, 63, 41, 0.05)'
-                    }}>
-                      <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #e4eaf0, #9eb0c2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#313f4d', border: '1.5px stroke #fff' }}>Ag</div>
-                      <div>
-                        <div style={{ fontSize: 9, fontWeight: 700, color: '#8c7d5f', textTransform: 'uppercase', letterSpacing: 0.5 }}>Silver Rate (1g)</div>
-                        <div className="poster-font-serif" style={{ fontSize: 18, fontWeight: 700, color: '#3d3016' }}>₹{silverRate.toLocaleString('en-IN')}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 8 Gram Banner */}
-                  <div style={{
-                    background: 'linear-gradient(90deg, #fdfbf7 0%, #fff7eb 50%, #fdfbf7 100%)',
-                    border: '1px solid #e8dbbe',
-                    borderRadius: 12,
-                    padding: '12px 20px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    boxShadow: '0 4px 12px rgba(74, 63, 41, 0.08)'
-                  }}>
-                    <div className="poster-font-title" style={{ fontSize: 14, fontWeight: 700, color: '#786235', letterSpacing: 1 }}>8 GRAMS</div>
-                    <div className="poster-font-serif" style={{ fontSize: 24, fontWeight: 800, color: '#822c1d', textShadow: '0 1px 1px #fff' }}>₹{gold8gValue}</div>
-                  </div>
-                </div>
-
-                {/* Footer Address */}
-                <div style={{
-                  borderTop: '0.5px solid #d4c5a3',
-                  paddingTop: 10,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 3,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: '#6e5e40',
-                  textAlign: 'center'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span>📍</span> <span>LOCATION: {locationStr.toUpperCase()}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span>📞</span> <span>{phoneStr}</span>
-                  </div>
-                </div>
+            {/* 1. BRAND LOGO ELEMENT (ABSOLUTE) */}
+            <div style={{
+              position: 'absolute',
+              top: `${logoY}%`,
+              left: `${logoX}%`,
+              transform: `translate(-50%, -50%) scale(${logoScale})`,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center',
+              zIndex: 10,
+              pointerEvents: 'none',
+              transition: 'all 0.05s'
+            }}>
+              <div style={{ marginBottom: 4 }}>
+                {logoImg ? (
+                  <img src={logoImg} alt="Logo" style={{ maxHeight: 52, maxWidth: 180, objectFit: 'contain' }} />
+                ) : (
+                  <DefaultLogoSVG color={textColor.startsWith('rgba') ? null : textColor} />
+                )}
               </div>
-            ) : (
-              // ── STYLE B: ROYAL MARBLE RING ────────────────────
+              <div className="poster-font-title" style={{ fontSize: 18, fontWeight: 700, color: textColor, lineHeight: 1, letterSpacing: 1.5 }}>MSGOLD</div>
+              <div style={{ fontSize: 7, fontWeight: 700, letterSpacing: 1.5, color: accentColor, marginTop: 3, textTransform: 'uppercase', borderTop: `0.5px solid ${accentColor}`, borderBottom: `0.5px solid ${accentColor}`, padding: '1px 6px' }}>
+                Since 1930
+              </div>
+            </div>
+
+            {/* 2. PRODUCT SHOWCASE IMAGE (ABSOLUTE) */}
+            {showProduct && (
               <div style={{
-                width: '100%',
-                height: '100%',
-                background: '#faf9f6',
-                border: '14px solid #ffffff',
-                outline: '1px solid #dcd1ba',
-                outlineOffset: '-14px',
-                padding: '24px 20px',
+                position: 'absolute',
+                top: `${productY}%`,
+                left: `${productX}%`,
+                transform: `translate(-50%, -50%) scale(${productScale})`,
+                width: 170,
+                height: 170,
+                zIndex: 5,
+                pointerEvents: 'none',
                 display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                color: '#1a3325',
-                boxSizing: 'border-box',
-                position: 'relative'
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.05s'
               }}>
-                {/* Gold floral corner borders */}
-                <div style={{ position: 'absolute', top: 18, left: 18, borderLeft: '2px solid #b59345', borderTop: '2px solid #b59345', width: 24, height: 24, opacity: 0.6 }} />
-                <div style={{ position: 'absolute', top: 18, right: 18, borderRight: '2px solid #b59345', borderTop: '2px solid #b59345', width: 24, height: 24, opacity: 0.6 }} />
-                <div style={{ position: 'absolute', bottom: 18, left: 18, borderLeft: '2px solid #b59345', borderBottom: '2px solid #b59345', width: 24, height: 24, opacity: 0.6 }} />
-                <div style={{ position: 'absolute', bottom: 18, right: 18, borderRight: '2px solid #b59345', borderBottom: '2px solid #b59345', width: 24, height: 24, opacity: 0.6 }} />
-
-                {/* Brand Header */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginTop: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {logoImg ? (
-                      <img src={logoImg} alt="Logo" style={{ maxHeight: 46, objectFit: 'contain' }} />
-                    ) : (
-                      <DefaultLogoSVG />
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                      <h1 className="poster-font-title" style={{ fontSize: 24, fontWeight: 700, color: '#a38237', margin: 0, lineHeight: 1, letterSpacing: 2 }}>MSGOLD</h1>
-                      <span style={{ fontSize: 9, fontWeight: 600, color: '#7a6a4c', letterSpacing: 1, textTransform: 'uppercase' }}>Since 1930</span>
-                    </div>
-                  </div>
-                  <div style={{ width: '80%', height: '1px', background: 'linear-gradient(90deg, transparent, #dcd1ba, transparent)', margin: '10px 0' }} />
-                </div>
-
-                {/* Middle Content: Split Ring & Rates */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 10, alignItems: 'center', margin: '10px 0' }}>
-                  
-                  {/* Left: Product Image */}
-                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 190, padding: 8 }}>
-                    {jewelryImg ? (
-                      <img src={jewelryImg} alt="Jewelry product" style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.12))' }} />
-                    ) : (
-                      <DefaultRingSVG />
-                    )}
-                  </div>
-
-                  {/* Right: Rates Panel */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    
-                    {/* Calendar date badge */}
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      border: '1px solid #b59345',
-                      borderRadius: 6,
-                      padding: '4px 10px',
-                      background: 'rgba(181, 147, 69, 0.05)',
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: '#a38237',
-                      alignSelf: 'flex-start'
-                    }}>
-                      <span>📅</span> <span>{dateStr}</span>
-                    </div>
-
-                    {/* Gold rate row */}
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#7a6a4c', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{ color: '#a38237' }}>✦</span> Gold Rate
-                      </div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: '#2b2311', marginTop: 2 }}>
-                        ₹{goldRate.toLocaleString('en-IN')} <span style={{ fontSize: 10, fontWeight: 500, color: '#7a6a4c' }}>/ Gram</span>
-                      </div>
-                    </div>
-
-                    {/* Silver rate row */}
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#7a6a4c', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span style={{ color: '#a38237' }}>✦</span> Silver Rate
-                      </div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: '#2b2311', marginTop: 2 }}>
-                        ₹{silverRate.toLocaleString('en-IN')} <span style={{ fontSize: 10, fontWeight: 500, color: '#7a6a4c' }}>/ Gram</span>
-                      </div>
-                    </div>
-
-                    {/* 8g Weight Banner */}
-                    <div style={{
-                      border: '1.5px solid #b59345',
-                      borderRadius: 8,
-                      padding: '8px 12px',
-                      background: '#ffffff',
-                      boxShadow: '0 4px 10px rgba(181, 147, 69, 0.1)'
-                    }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: '#7a6a4c', textTransform: 'uppercase', letterSpacing: 0.5 }}>8 Gram Value</div>
-                      <div style={{ fontSize: 19, fontWeight: 800, color: '#8a2b1f', marginTop: 1 }}>
-                        ₹{gold8gValue}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer details */}
-                <div style={{
-                  borderTop: '1px solid #dcd1ba',
-                  paddingTop: 12,
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: '#7a6a4c'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, maxWidth: '50%', textAlign: 'left' }}>
-                    <span>📍</span> <span>{locationStr}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, textAlign: 'right' }}>
-                    <span>📞</span> <span>{phoneStr}</span>
-                  </div>
-                </div>
+                {jewelryImg ? (
+                  <img 
+                    src={jewelryImg} 
+                    alt="Jewelry Showcase" 
+                    style={{ 
+                      maxWidth: '100%', 
+                      maxHeight: '100%', 
+                      objectFit: 'contain',
+                      filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.18))' 
+                    }} 
+                  />
+                ) : (
+                  <DefaultEarringSVG />
+                )}
               </div>
             )}
+
+            {/* 3. HERO TITLE & DATE (ABSOLUTE) */}
+            <div style={{
+              position: 'absolute',
+              top: `${titleY}%`,
+              left: '50%',
+              transform: `translate(-50%, -50%) scale(${titleScale})`,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 4,
+              zIndex: 8,
+              textAlign: 'center',
+              width: '100%',
+              pointerEvents: 'none',
+              transition: 'all 0.05s'
+            }}>
+              <div className="poster-font-serif" style={{ fontSize: 26, fontStyle: 'italic', fontWeight: 600, color: accentColor, textShadow: '0 1px 1px rgba(255,255,255,0.2)', lineHeight: 1 }}>
+                Today's
+              </div>
+              <div className="poster-font-title" style={{ fontSize: 32, fontWeight: 800, color: textColor, lineHeight: 1, letterSpacing: 2 }}>
+                GOLD RATE
+              </div>
+              <div style={{
+                border: `1.5px solid ${accentColor}`,
+                borderRadius: 20,
+                padding: '3px 24px',
+                fontSize: 14,
+                fontWeight: 700,
+                color: textColor,
+                background: cardBg,
+                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)',
+                marginTop: 2
+              }}>
+                {dateStr}
+              </div>
+            </div>
+
+            {/* 4. RATE CARDS PANEL (ABSOLUTE) */}
+            <div style={{
+              position: 'absolute',
+              top: `${ratesY}%`,
+              left: '50%',
+              transform: `translate(-50%, -50%) scale(${ratesScale})`,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+              width: '86%',
+              zIndex: 9,
+              pointerEvents: 'none',
+              transition: 'all 0.05s'
+            }}>
+              
+              {/* Gold & Silver Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                
+                {/* Gold Card */}
+                <div style={{
+                  background: cardBg,
+                  border: cardBorder,
+                  backdropFilter: 'blur(4px)',
+                  borderRadius: 14,
+                  padding: '10px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  boxShadow: '0 4px 10px rgba(0, 0, 0, 0.06)'
+                }}>
+                  <div style={{ 
+                    width: 32, 
+                    height: 32, 
+                    borderRadius: '50%', 
+                    background: 'linear-gradient(135deg, #fce089, #d4a32c)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    fontSize: 12, 
+                    fontWeight: 800, 
+                    color: '#4a3605', 
+                    border: '1.5px stroke #fff',
+                    flexShrink: 0
+                  }}>
+                    Au
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: textColor, opacity: 0.75, textTransform: 'uppercase', letterSpacing: 0.5 }}>Gold (1g)</div>
+                    <div className="poster-font-serif" style={{ fontSize: 16, fontWeight: 700, color: textColor }}>₹{goldRate.toLocaleString('en-IN')}</div>
+                  </div>
+                </div>
+
+                {/* Silver Card */}
+                <div style={{
+                  background: cardBg,
+                  border: cardBorder,
+                  backdropFilter: 'blur(4px)',
+                  borderRadius: 14,
+                  padding: '10px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  boxShadow: '0 4px 10px rgba(0, 0, 0, 0.06)'
+                }}>
+                  <div style={{ 
+                    width: 32, 
+                    height: 32, 
+                    borderRadius: '50%', 
+                    background: 'linear-gradient(135deg, #e4eaf0, #9eb0c2)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    fontSize: 12, 
+                    fontWeight: 800, 
+                    color: '#313f4d', 
+                    border: '1.5px stroke #fff',
+                    flexShrink: 0
+                  }}>
+                    Ag
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: textColor, opacity: 0.75, textTransform: 'uppercase', letterSpacing: 0.5 }}>Silver (1g)</div>
+                    <div className="poster-font-serif" style={{ fontSize: 16, fontWeight: 700, color: textColor }}>₹{silverRate.toLocaleString('en-IN')}</div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* 8 Gram Banner */}
+              <div style={{
+                background: cardBg,
+                border: cardBorder,
+                backdropFilter: 'blur(4px)',
+                borderRadius: 12,
+                padding: '11px 18px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)'
+              }}>
+                <div className="poster-font-title" style={{ fontSize: 13, fontWeight: 700, color: textColor, letterSpacing: 0.8 }}>8 GRAMS</div>
+                <div className="poster-font-serif" style={{ fontSize: 22, fontWeight: 800, color: textColor.startsWith('#fff') || textColor.startsWith('#f8') ? textColor : '#991b1b', textShadow: '0 1px 1px rgba(255,255,255,0.1)' }}>
+                  ₹{gold8gValue}
+                </div>
+              </div>
+
+            </div>
+
+            {/* 5. FOOTER DETAILS (ABSOLUTE) */}
+            <div style={{
+              position: 'absolute',
+              top: `${footerY}%`,
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '88%',
+              borderTop: `0.5px solid ${accentColor}`,
+              paddingTop: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 3,
+              fontSize: 10,
+              fontWeight: 600,
+              color: textColor,
+              textAlign: 'center',
+              zIndex: 10,
+              pointerEvents: 'none',
+              transition: 'all 0.05s'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 11 }}>📍</span> <span>{locationStr.toUpperCase()}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: 0.9 }}>
+                <span style={{ fontSize: 11 }}>📞</span> <span>{phoneStr}</span>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
