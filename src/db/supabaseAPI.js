@@ -1,5 +1,12 @@
 import { supabase } from './supabaseClient';
 
+const ensureRowReturned = (data, tableName) => {
+  if (!data || data.length === 0) {
+    throw new Error(`No data returned from table '${tableName}'. If you are running Supabase, verify that Row-Level Security (RLS) is disabled for '${tableName}' or that you have created an appropriate SELECT policy.`);
+  }
+  return data[0];
+};
+
 export const supabaseAPI = {
   // --- METAL RATES ---
   saveMetalRates: async (rateData) => {
@@ -13,7 +20,8 @@ export const supabaseAPI = {
         }])
         .select();
       if (error) throw error;
-      return { success: true, id: data[0].id };
+      const row = ensureRowReturned(data, 'metal_rates');
+      return { success: true, id: row.id };
     } catch (err) {
       console.error("Error saving metal rates:", err);
       return { success: false, error: err.message };
@@ -48,7 +56,8 @@ export const supabaseAPI = {
       }])
       .select();
     if (orderErr) throw orderErr;
-    const orderId = order[0].id;
+    const orderRow = ensureRowReturned(order, 'sales_orders');
+    const orderId = orderRow.id;
 
     if (orderData.products && orderData.products.length > 0) {
       const productsToInsert = orderData.products.map(p => ({
@@ -150,7 +159,8 @@ export const supabaseAPI = {
       }])
       .select();
     if (error) throw error;
-    return { id: data[0].id };
+    const row = ensureRowReturned(data, 'customers');
+    return { id: row.id };
   },
 
   getAllCustomers: async () => {
@@ -266,7 +276,8 @@ export const supabaseAPI = {
       }])
       .select();
     if (error) throw error;
-    return { id: emp[0].id };
+    const row = ensureRowReturned(emp, 'employees');
+    return { id: row.id };
   },
 
   updateEmployee: async (employeeId, data) => {
@@ -334,7 +345,8 @@ export const supabaseAPI = {
       .insert([{ name: name.trim() }])
       .select();
     if (error) throw error;
-    return { id: data[0].id };
+    const row = ensureRowReturned(data, 'roles');
+    return { id: row.id };
   },
 
   deleteRole: async (roleId) => {
@@ -361,7 +373,8 @@ export const supabaseAPI = {
       }, { onConflict: 'employee_id,date' })
       .select();
     if (error) throw error;
-    return { id: att[0].id };
+    const row = ensureRowReturned(att, 'attendance');
+    return { id: row.id };
   },
 
   getAttendanceByDate: async (date) => {
@@ -476,7 +489,8 @@ export const supabaseAPI = {
       }])
       .select();
     if (error) throw error;
-    return { id: scheme[0].id };
+    const row = ensureRowReturned(scheme, 'gold_schemes');
+    return { id: row.id };
   },
 
   getAllGoldSchemes: async () => {
@@ -544,7 +558,8 @@ export const supabaseAPI = {
       }])
       .select();
     if (error) throw error;
-    return { id: coll[0].id };
+    const row = ensureRowReturned(coll, 'gold_collections');
+    return { id: row.id };
   },
 
   getGoldCollections: async (schemeId) => {
@@ -596,7 +611,8 @@ export const supabaseAPI = {
       }])
       .select();
     if (invErr) throw invErr;
-    const invoiceId = invoice[0].id;
+    const invoiceRow = ensureRowReturned(invoice, 'invoices');
+    const invoiceId = invoiceRow.id;
 
     if (data.items && data.items.length > 0) {
       const itemsToInsert = data.items.map(item => ({
