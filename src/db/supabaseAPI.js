@@ -3,26 +3,36 @@ import { supabase } from './supabaseClient';
 export const supabaseAPI = {
   // --- METAL RATES ---
   saveMetalRates: async (rateData) => {
-    const { data, error } = await supabase
-      .from('metal_rates')
-      .insert([{
-        gold_rate: rateData.goldRate,
-        silver_rate: rateData.silverRate,
-        gold_24_rate: rateData.gold24Rate
-      }])
-      .select();
-    if (error) throw error;
-    return { id: data[0].id };
+    try {
+      const { data, error } = await supabase
+        .from('metal_rates')
+        .insert([{
+          gold_rate: rateData.goldRate,
+          silver_rate: rateData.silverRate,
+          gold_24_rate: rateData.gold24Rate
+        }])
+        .select();
+      if (error) throw error;
+      return { success: true, id: data[0].id };
+    } catch (err) {
+      console.error("Error saving metal rates:", err);
+      return { success: false, error: err.message };
+    }
   },
 
   getMetalRates: async () => {
-    const { data, error } = await supabase
-      .from('metal_rates')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(1);
-    if (error) throw error;
-    return data; // SQLite returns array. If empty, returns []
+    try {
+      const { data, error } = await supabase
+        .from('metal_rates')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return { success: true, metal_rates: data };
+    } catch (err) {
+      console.error("Error retrieving metal rates:", err);
+      return { success: false, error: err.message };
+    }
   },
 
   // --- SALES ORDERS ---

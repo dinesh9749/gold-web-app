@@ -113,8 +113,8 @@ const colorThemes = {
 
 export default function PosterCreate() {
   // Input states
-  const [goldRate, setGoldRate] = useState(13800);
-  const [silverRate, setSilverRate] = useState(260);
+  const [goldRate, setGoldRate] = useState('13800');
+  const [silverRate, setSilverRate] = useState('260');
   const [dateStr, setDateStr] = useState('');
   const [locationStr, setLocationStr] = useState('Srivilliputtur, Dhalavaipuram');
   const [phoneStr, setPhoneStr] = useState('Ph - 9443112034, 9345100001');
@@ -172,10 +172,11 @@ export default function PosterCreate() {
       try {
         if (window.electronAPI && typeof window.electronAPI.getMetalRates === 'function') {
           const res = await window.electronAPI.getMetalRates();
-          if (res && res.length > 0) {
-            const r = res[0];
-            if (r.gold_rate) setGoldRate(parseInt(r.gold_rate) || 13800);
-            if (r.silver_rate) setSilverRate(parseInt(r.silver_rate) || 260);
+          const rates = res?.metal_rates || (Array.isArray(res) ? res : []);
+          if (rates && rates.length > 0) {
+            const r = rates[0];
+            if (r.gold_rate) setGoldRate(r.gold_rate.toString());
+            if (r.silver_rate) setSilverRate(r.silver_rate.toString());
           }
         }
       } catch (err) {
@@ -265,7 +266,9 @@ export default function PosterCreate() {
     }
   };
 
-  const gold8gValue = (goldRate * 8).toLocaleString('en-IN');
+  const goldNum = parseFloat(goldRate) || 0;
+  const silverNum = parseFloat(silverRate) || 0;
+  const gold8gValue = (goldNum * 8).toLocaleString('en-IN');
 
   const canvasStyle = bgType === 'upload' && uploadedBg
     ? { backgroundImage: `url(${uploadedBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }
@@ -440,11 +443,11 @@ export default function PosterCreate() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div>
                     <label className="form-label">Gold Rate (1g)</label>
-                    <input type="number" className="form-input" value={goldRate} onChange={e => setGoldRate(parseFloat(e.target.value) || 0)} />
+                    <input type="text" className="form-input" value={goldRate} onChange={e => setGoldRate(e.target.value)} />
                   </div>
                   <div>
                     <label className="form-label">Silver Rate (1g)</label>
-                    <input type="number" className="form-input" value={silverRate} onChange={e => setSilverRate(parseFloat(e.target.value) || 0)} />
+                    <input type="text" className="form-input" value={silverRate} onChange={e => setSilverRate(e.target.value)} />
                   </div>
                 </div>
 
@@ -772,7 +775,7 @@ export default function PosterCreate() {
                   </div>
                   <div>
                     <div style={{ fontSize: 8, fontWeight: 700, color: textColor, opacity: 0.75, textTransform: 'uppercase', letterSpacing: 0.5 }}>Gold (1g)</div>
-                    <div className="poster-font-serif" style={{ fontSize: 16, fontWeight: 700, color: textColor }}>₹{goldRate.toLocaleString('en-IN')}</div>
+                    <div className="poster-font-serif" style={{ fontSize: 16, fontWeight: 700, color: textColor }}>₹{goldNum.toLocaleString('en-IN')}</div>
                   </div>
                 </div>
 
@@ -806,7 +809,7 @@ export default function PosterCreate() {
                   </div>
                   <div>
                     <div style={{ fontSize: 8, fontWeight: 700, color: textColor, opacity: 0.75, textTransform: 'uppercase', letterSpacing: 0.5 }}>Silver (1g)</div>
-                    <div className="poster-font-serif" style={{ fontSize: 16, fontWeight: 700, color: textColor }}>₹{silverRate.toLocaleString('en-IN')}</div>
+                    <div className="poster-font-serif" style={{ fontSize: 16, fontWeight: 700, color: textColor }}>₹{silverNum.toLocaleString('en-IN')}</div>
                   </div>
                 </div>
 

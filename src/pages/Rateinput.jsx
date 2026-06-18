@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const GoldSilverRateInput = () => {
   const [goldRate, setGoldRate] = useState('');
@@ -11,6 +11,23 @@ const GoldSilverRateInput = () => {
     setNotification({ message, type, visible: true });
     setTimeout(() => setNotification(prev => ({ ...prev, visible: false })), 3500);
   };
+
+  useEffect(() => {
+    const fetchCurrentRates = async () => {
+      try {
+        const result = await window.electronAPI.getMetalRates();
+        if (result.success && result.metal_rates && result.metal_rates.length > 0) {
+          const r = result.metal_rates[0];
+          if (r.gold_rate) setGoldRate(r.gold_rate.toString());
+          if (r.silver_rate) setSilverRate(r.silver_rate.toString());
+          if (r.gold_24_rate) setGold24Rate(r.gold_24_rate.toString());
+        }
+      } catch (error) {
+        console.error('Error fetching current rates:', error);
+      }
+    };
+    fetchCurrentRates();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,7 +44,6 @@ const GoldSilverRateInput = () => {
       const result = await window.electronAPI.saveMetalRates({ goldRate: g, silverRate: s, gold24Rate: g24 });
       if (result.success) {
         showNotification('Metal rates saved successfully!', 'success');
-        setGoldRate(''); setSilverRate(''); setGold24Rate('');
       } else {
         showNotification(`Error: ${result.error}`, 'error');
       }
