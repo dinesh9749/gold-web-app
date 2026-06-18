@@ -1,20 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 export default function Settings() {
-  const [apiInfo, setApiInfo] = useState(null);
-  const [copied, setCopied]   = useState(false);
-
-  useEffect(() => {
-    window.electronAPI?.getApiInfo?.().then(info => setApiInfo(info)).catch(() => {});
-  }, []);
-
-  const copy = (text) => {
-    navigator.clipboard?.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
   const [passcode, setPasscode] = useState(() => localStorage.getItem("goldApp_adminPasscode") || "");
   
   // Form states
@@ -88,82 +74,8 @@ export default function Settings() {
       <div className="section-header" style={{ marginBottom: 24 }}>
         <div>
           <div className="section-title" style={{ fontSize: 18 }}>Settings</div>
-          <div className="section-sub">App configuration and mobile access</div>
+          <div className="section-sub">App configuration and security settings</div>
         </div>
-      </div>
-
-      {/* Mobile Access Card */}
-      <div className="card" style={{ marginBottom: 20, maxWidth: 600 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 10, fontSize: 20,
-            background: 'linear-gradient(135deg, #fbbf24, #d97706)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>📱</div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>Mobile Attendance Report</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>View on phone via same Wi-Fi network</div>
-          </div>
-          <div style={{
-            marginLeft: 'auto', fontSize: 11, fontWeight: 700, padding: '4px 10px',
-            borderRadius: 20, background: 'rgba(74,222,128,0.1)', border: '1px solid #4ade80',
-            color: '#4ade80',
-          }}>● Running</div>
-        </div>
-
-        {apiInfo ? (
-          <>
-            <div style={{
-              background: 'rgba(251,191,36,0.05)', border: '1px solid var(--border-default)',
-              borderRadius: 10, padding: 16, marginBottom: 14,
-            }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                Open this URL on your phone browser
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{
-                  flex: 1, fontSize: 18, fontWeight: 800, color: 'var(--gold-300)',
-                  fontFamily: 'monospace', letterSpacing: '0.04em',
-                }}>{apiInfo.url}</div>
-                <button onClick={() => copy(apiInfo.url)} style={{
-                  padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 700,
-                  border: '1px solid var(--border-default)', cursor: 'pointer',
-                  background: copied ? 'rgba(74,222,128,0.15)' : 'var(--bg-elevated)',
-                  color: copied ? '#4ade80' : 'var(--text-secondary)',
-                  transition: 'all 0.2s',
-                }}>{copied ? '✓ Copied' : '📋 Copy'}</button>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {[
-                { label: 'PC IP Address', value: apiInfo.ip, icon: '🖥' },
-                { label: 'Port',          value: apiInfo.port, icon: '🔌' },
-              ].map(item => (
-                <div key={item.label} style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 12px' }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase' }}>
-                    {item.icon} {item.label}
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'monospace' }}>{item.value}</div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{
-              marginTop: 14, padding: '10px 14px', borderRadius: 8,
-              background: 'rgba(251,191,36,0.05)', border: '1px solid var(--border-subtle)',
-              fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6,
-            }}>
-              💡 <strong style={{ color: 'var(--text-secondary)' }}>How to use:</strong> Connect your phone to the same Wi-Fi as this PC →
-              Open your phone browser → Type the URL above → See daily &amp; monthly attendance reports
-            </div>
-          </>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0' }}>
-            <div className="spinner" />
-            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Fetching server info…</span>
-          </div>
-        )}
       </div>
 
       {/* Passcode Security Card */}
@@ -293,8 +205,7 @@ export default function Settings() {
         {[
           { label: 'App Name',    value: 'MS Gold Attendance Manager' },
           { label: 'Version',     value: '2.0.0' },
-          { label: 'Database',    value: 'SQLite (local)' },
-          { label: 'Mobile API',  value: `Port ${apiInfo?.port || 3456}` },
+          { label: 'Database',    value: 'Supabase (cloud)' },
         ].map(row => (
           <div key={row.label} style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
