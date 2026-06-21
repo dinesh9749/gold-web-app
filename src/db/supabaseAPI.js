@@ -52,7 +52,8 @@ export const supabaseAPI = {
         advance_amount: orderData.advanceAmount || 0,
         advance_gold: orderData.advanceGold || 0,
         delivery_date: orderData.deliveryDate,
-        status: orderData.status || 'incomplete'
+        status: orderData.status || 'incomplete',
+        notes: orderData.notes || null
       }])
       .select();
     if (orderErr) throw orderErr;
@@ -90,6 +91,7 @@ export const supabaseAPI = {
       status: so.status,
       createdAt: so.created_at,
       updatedAt: so.updated_at,
+      notes: so.notes || '',
       products: (so.order_products || []).map(op => ({
         type: op.product_type,
         ornament: op.ornament,
@@ -125,6 +127,7 @@ export const supabaseAPI = {
       status: data.status,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
+      notes: data.notes || '',
       products: (data.order_products || []).map(op => ({
         type: op.product_type,
         ornament: op.ornament,
@@ -607,7 +610,9 @@ export const supabaseAPI = {
         old_gold_weight: data.oldGoldWeight || 0,
         old_gold_amount: data.oldGoldAmount || 0,
         grand_total: data.grandTotal,
-        final_amount: data.finalAmount
+        final_amount: data.finalAmount,
+        other_charges: data.otherCharges || 0,
+        product_photo: data.productPhoto || null
       }])
       .select();
     if (invErr) throw invErr;
@@ -655,6 +660,8 @@ export const supabaseAPI = {
       oldGoldAmount: row.old_gold_amount,
       grandTotal: row.grand_total,
       finalAmount: row.final_amount,
+      otherCharges: parseFloat(row.other_charges) || 0,
+      productPhoto: row.product_photo || null,
       createdAt: row.created_at
     }));
   },
@@ -683,6 +690,8 @@ export const supabaseAPI = {
       oldGoldAmount: invoice.old_gold_amount,
       grandTotal: invoice.grand_total,
       finalAmount: invoice.final_amount,
+      otherCharges: parseFloat(invoice.other_charges) || 0,
+      productPhoto: invoice.product_photo || null,
       createdAt: invoice.created_at,
       items: (invoice.invoice_items || []).map(item => ({
         id: item.id,
@@ -701,6 +710,61 @@ export const supabaseAPI = {
   deleteInvoice: async (id) => {
     const { error } = await supabase
       .from('invoices')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return { changes: 1 };
+  },
+
+  updateInvoicePhoto: async (id, photoData) => {
+    const { error } = await supabase
+      .from('invoices')
+      .update({ product_photo: photoData })
+      .eq('id', id);
+    if (error) throw error;
+    return { success: true };
+  },
+
+  // --- SOLDERING & ENGRAVING ---
+  saveSolderingJob: async (jobData) => {
+    const { data, error } = await supabase
+      .from('soldering_engraving_jobs')
+      .insert([{
+        date: jobData.date,
+        customer_name: jobData.customerName,
+        product: jobData.product,
+        marking_charges: jobData.markingCharges,
+        gst_amount: jobData.gstAmount,
+        total_amount: jobData.totalAmount
+      }])
+      .select();
+    if (error) throw error;
+    const row = ensureRowReturned(data, 'soldering_engraving_jobs');
+    return { id: row.id };
+  },
+
+  getAllSolderingJobs: async () => {
+    const { data, error } = await supabase
+      .from('soldering_engraving_jobs')
+      .select('*')
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data.map(row => ({
+      id: row.id,
+      date: row.date,
+      customerName: row.customer_name,
+      product: row.product,
+      markingCharges: parseFloat(row.marking_charges) || 0,
+      gstAmount: parseFloat(row.gst_amount) || 0,
+      totalAmount: parseFloat(row.total_amount) || 0,
+      createdAt: row.created_at
+    }));
+  },
+
+  deleteSolderingJob: async (id) => {
+    const { error } = await supabase
+      .from('soldering_engraving_jobs')
       .delete()
       .eq('id', id);
     if (error) throw error;

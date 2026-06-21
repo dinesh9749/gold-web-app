@@ -8,6 +8,7 @@ import Invoice from './pages/Invoice';
 import CustomerView from './pages/CustomerView';
 import SalesOrders from './pages/SalesOrders';
 import MsDigiGold from './pages/MsDigiGold';
+import MsSolderingEngraving from './pages/MsSolderingEngraving';
 import Settings from './pages/Settings';
 import Rateinput from './pages/Rateinput';
 import Receipt from './pages/Receipt';
@@ -28,6 +29,7 @@ function App() {
           <Route path="customerview" element={<CustomerView />} />
           <Route path="SalesOrders" element={<SalesOrders />} />
           <Route path="MsDigiGold" element={<MsDigiGold />} />
+          <Route path="MsSolderingEngraving" element={<MsSolderingEngraving />} />
           <Route path="attendance" element={<Attendance />} />
           <Route path="employee-setup" element={<EmployeeSetup />} />
           <Route path="settings" element={<Settings />} />

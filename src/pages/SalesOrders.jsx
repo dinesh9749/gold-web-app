@@ -19,6 +19,8 @@ export default function SalesOrderPage() {
   const [deliveryDate, setDeliveryDate] = useState('');
   const [status, setStatus] = useState('incomplete');
   const [products, setProducts] = useState([]);
+  const [notes, setNotes] = useState('');
+  const [metalRates, setMetalRates] = useState({ gold22: 0, gold24: 0, silver: 0 });
   const [submitting, setSubmitting] = useState(false);
 
   // New product
@@ -29,7 +31,26 @@ export default function SalesOrderPage() {
   const productTypeOptions = ['Gold 24ct', 'Silver', 'Gold 916'];
   const ornamentOptions = ['Chain', 'Bangles', 'Ring', 'Necklace', 'Earrings', 'Bracelet', 'Anklet', 'Pendant'];
 
-  useEffect(() => { loadOrders(); }, []);
+  useEffect(() => {
+    loadOrders();
+    fetchRates();
+  }, []);
+
+  const fetchRates = async () => {
+    try {
+      const res = await window.electronAPI?.getMetalRates();
+      if (res?.success && res.metal_rates?.length > 0) {
+        const r = res.metal_rates[0];
+        setMetalRates({
+          gold22: parseFloat(r.gold_rate) || 0,
+          gold24: parseFloat(r.gold_24_rate) || 0,
+          silver: parseFloat(r.silver_rate) || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching metal rates:', error);
+    }
+  };
 
   const loadOrders = async () => {
     try {
@@ -46,6 +67,7 @@ export default function SalesOrderPage() {
   const handleCreateOrder = () => {
     setCustomerName(''); setAdvanceAmount(''); setAdvanceGold('');
     setDeliveryDate(''); setStatus('incomplete'); setProducts([]);
+    setNotes('');
     setShowModal(true);
   };
 
@@ -67,7 +89,8 @@ export default function SalesOrderPage() {
         customerName, products,
         advanceAmount: parseFloat(advanceAmount) || 0,
         advanceGold: parseFloat(advanceGold) || 0,
-        deliveryDate, status
+        deliveryDate, status,
+        notes: notes || null
       };
       const response = await window.electronAPI?.saveSalesOrder(orderData);
       if (response?.id) {
@@ -113,6 +136,16 @@ export default function SalesOrderPage() {
 
   const completedCount = orders.filter(o => o.status === 'complete').length;
   const pendingCount = orders.filter(o => o.status !== 'complete').length;
+
+  const getLiveRateForType = (type) => {
+    if (type === 'Gold 916') return metalRates.gold22;
+    if (type === 'Gold 24ct') return metalRates.gold24;
+    if (type === 'Silver') return metalRates.silver;
+    return 0;
+  };
+
+  const liveRate = getLiveRateForType(newProductType);
+  const calculatedValue = liveRate * (parseFloat(newWeight) || 0);
 
   if (loading) {
     return (
@@ -290,22 +323,33 @@ export default function SalesOrderPage() {
                   }}>No items yet — click "Add Item" above</div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {products.map((p, idx) => (
-                      <div key={idx} style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 12px',
-                        border: '1px solid var(--border-subtle)',
-                      }}>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <span className="product-chip">{p.type}</span>
-                          <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{p.ornament} — {p.weight}g</span>
+                    {products.map((p, idx) => {
+                      const itemRate = getLiveRateForType(p.type);
+                      const itemVal = itemRate * p.weight;
+                      return (
+                        <div key={idx} style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 12px',
+                          border: '1px solid var(--border-subtle)',
+                        }}>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <span className="product-chip">{p.type}</span>
+                            <span style={{ fontSize: 13, color: 'var(--text-primary)' }}>{p.ornament} — {p.weight}g</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            {itemVal > 0 && (
+                              <span style={{ fontWeight: 700, color: '#4ade80', fontSize: 13 }}>
+                                ₹{Math.round(itemVal).toLocaleString('en-IN')}
+                              </span>
+                            )}
+                            <button onClick={() => removeProduct(idx)}
+                              style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                              <X size={14} />
+                            </button>
+                          </div>
                         </div>
-                        <button onClick={() => removeProduct(idx)}
-                          style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer' }}>
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -340,6 +384,19 @@ export default function SalesOrderPage() {
                     <option value="complete">Complete</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="form-label">Notes / Custom Instructions</label>
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  className="form-input"
+                  placeholder="Enter any design instructions, metal purity details, or delivery remarks..."
+                  rows="3"
+                  style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }}
+                />
               </div>
             </div>
             <div className="modal-footer">
@@ -378,6 +435,30 @@ export default function SalesOrderPage() {
                 <input type="number" step="0.1" value={newWeight} onChange={e => setNewWeight(e.target.value)}
                   className="form-input" placeholder="e.g. 12.5" />
               </div>
+
+              {liveRate > 0 && (
+                <div style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 10,
+                  padding: 12,
+                  marginTop: 6,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
+                    <span>Live Rate ({newProductType}):</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>₹{liveRate.toLocaleString('en-IN')}/g</span>
+                  </div>
+                  {calculatedValue > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, borderTop: '1px solid var(--border-subtle)', paddingTop: 6, marginTop: 4 }}>
+                      <span style={{ fontWeight: 600 }}>Est. Metal Value:</span>
+                      <span style={{ fontWeight: 800, color: '#4ade80' }}>₹{Math.round(calculatedValue).toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowProductModal(false)}>Cancel</button>
@@ -413,20 +494,41 @@ export default function SalesOrderPage() {
                 <label className="form-label">Products</label>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {selectedOrder.products?.map((p, idx) => (
-                  <div key={idx} style={{
-                    background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px',
-                    border: '1px solid var(--border-subtle)',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{p.type} — {p.ornament}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Weight: {p.weight}g</div>
+                {selectedOrder.products?.map((p, idx) => {
+                  const itemRate = getLiveRateForType(p.type);
+                  const itemVal = itemRate * p.weight;
+                  return (
+                    <div key={idx} style={{
+                      background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px',
+                      border: '1px solid var(--border-subtle)',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{p.type} — {p.ornament}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Weight: {p.weight}g</div>
+                      </div>
+                      {itemVal > 0 && (
+                        <span style={{ fontWeight: 700, color: '#4ade80', fontSize: 13 }}>
+                          ₹{Math.round(itemVal).toLocaleString('en-IN')}
+                        </span>
+                      )}
                     </div>
-                    <span className="product-chip">{p.weight}g</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+              {selectedOrder.notes && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Notes</div>
+                  <div style={{
+                    background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 14px',
+                    border: '1px solid var(--border-subtle)', fontSize: 13, color: 'var(--text-primary)',
+                    whiteSpace: 'pre-wrap', lineHeight: 1.4
+                  }}>
+                    {selectedOrder.notes}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setSelectedOrder(null)}>Close</button>

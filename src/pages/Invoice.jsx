@@ -20,8 +20,20 @@ const Invoice = () => {
 
   const [showPreview, setShowPreview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showPhotoManager, setShowPhotoManager] = useState(false);
+  const [photoManagerInvoice, setPhotoManagerInvoice] = useState(null);
+  const [deletingPhotoIndex, setDeletingPhotoIndex] = useState(null);
+  const [photoManagerMessage, setPhotoManagerMessage] = useState(null);
+
+  useEffect(() => {
+    if (!showPhotoManager) {
+      setDeletingPhotoIndex(null);
+      setPhotoManagerMessage(null);
+    }
+  }, [showPhotoManager]);
 
   const [invoiceData, setInvoiceData] = useState({
+    id: null,
     invoiceNo: "",
     date: new Date().toISOString().split("T")[0],
     customerId: null,
@@ -41,7 +53,9 @@ const Invoice = () => {
     sgstRate: 1.5,
     oldGoldWeight: 0,
     oldGoldRate: 0,
-    oldGoldAmount: 0
+    oldGoldAmount: 0,
+    otherCharges: "",
+    productPhoto: null
   });
 
   useEffect(() => {
@@ -111,7 +125,8 @@ const Invoice = () => {
   };
 
   const calculateSubTotal = () => {
-    return invoiceData.items.reduce((total, item) => total + Number(item.amount), 0);
+    const itemsTotal = invoiceData.items.reduce((total, item) => total + Number(item.amount), 0);
+    return itemsTotal + (Number(invoiceData.otherCharges) || 0);
   };
 
   const calculateTax = (subTotal, rate) => {
@@ -145,6 +160,144 @@ const Invoice = () => {
       
       return nextState;
     });
+  };
+
+  const handlePhotoUploadForInvoice = async (invoiceId, file) => {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setPhotoManagerMessage({ text: "Image size must be less than 2MB.", type: "error" });
+      setTimeout(() => setPhotoManagerMessage(null), 4000);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Photo = reader.result;
+      try {
+        const invoice = invoices.find(inv => inv.id === invoiceId);
+        let photos = [];
+        if (invoice && invoice.productPhoto) {
+          try {
+            if (invoice.productPhoto.startsWith('[')) {
+              photos = JSON.parse(invoice.productPhoto);
+            } else {
+              photos = [invoice.productPhoto];
+            }
+          } catch (e) {
+            photos = [invoice.productPhoto];
+          }
+        }
+        
+        photos.push(base64Photo);
+        const stringified = JSON.stringify(photos);
+
+        await window.electronAPI?.updateInvoicePhoto(invoiceId, stringified);
+        
+        // Update local invoices state so the list immediately shows the thumbnail
+        setInvoices(prev => prev.map(inv => {
+          if (inv.id === invoiceId) {
+            return { ...inv, productPhoto: stringified };
+          }
+          return inv;
+        }));
+
+        // If preview modal is open for this invoice, update modal state
+        setInvoiceData(prev => {
+          if (prev.id === invoiceId) {
+            return { ...prev, productPhoto: stringified };
+          }
+          return prev;
+        });
+
+        // If photo manager is open, update its state
+        setPhotoManagerInvoice(prev => {
+          if (prev && prev.id === invoiceId) {
+            return { ...prev, productPhoto: stringified };
+          }
+          return prev;
+        });
+
+        setPhotoManagerMessage({ text: "Product photo added successfully!", type: "success" });
+        setTimeout(() => setPhotoManagerMessage(null), 3000);
+      } catch (err) {
+        console.error(err);
+        setPhotoManagerMessage({ text: "Failed to save product photo.", type: "error" });
+        setTimeout(() => setPhotoManagerMessage(null), 3000);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePhotoDeleteForInvoice = async (invoiceId, indexToDelete) => {
+    try {
+      const invoice = invoices.find(inv => inv.id === invoiceId);
+      let photos = [];
+      if (invoice && invoice.productPhoto) {
+        try {
+          if (invoice.productPhoto.startsWith('[')) {
+            photos = JSON.parse(invoice.productPhoto);
+          } else {
+            photos = [invoice.productPhoto];
+          }
+        } catch (e) {
+          photos = [invoice.productPhoto];
+        }
+      }
+
+      photos.splice(indexToDelete, 1);
+      const stringified = photos.length > 0 ? JSON.stringify(photos) : null;
+
+      await window.electronAPI?.updateInvoicePhoto(invoiceId, stringified);
+      
+      setInvoices(prev => prev.map(inv => {
+        if (inv.id === invoiceId) {
+          return { ...inv, productPhoto: stringified };
+        }
+        return inv;
+      }));
+
+      setInvoiceData(prev => {
+        if (prev.id === invoiceId) {
+          return { ...prev, productPhoto: stringified };
+        }
+        return prev;
+      });
+
+      setPhotoManagerInvoice(prev => {
+        if (prev && prev.id === invoiceId) {
+          return { ...prev, productPhoto: stringified };
+        }
+        return prev;
+      });
+
+      setPhotoManagerMessage({ text: "Product photo deleted successfully!", type: "success" });
+      setTimeout(() => setPhotoManagerMessage(null), 3000);
+    } catch (err) {
+      console.error(err);
+      setPhotoManagerMessage({ text: "Failed to delete product photo.", type: "error" });
+      setTimeout(() => setPhotoManagerMessage(null), 3000);
+    }
+  };
+
+  const parseInvoicePhotos = (productPhotoStr) => {
+    if (!productPhotoStr) return [];
+    try {
+      if (productPhotoStr.startsWith('[')) {
+        return JSON.parse(productPhotoStr);
+      }
+      return [productPhotoStr];
+    } catch (e) {
+      return [productPhotoStr];
+    }
+  };
+
+  const handleDownloadPhoto = (photoBase64, index, invoiceNo) => {
+    const link = document.createElement('a');
+    link.href = photoBase64;
+    link.download = `invoice_${invoiceNo || 'INV'}_photo_${index + 1}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleItemChange = (index, field, value) => {
@@ -227,6 +380,8 @@ const Invoice = () => {
         oldGoldAmount: parseFloat(invoiceData.oldGoldAmount) || 0,
         grandTotal: grand,
         finalAmount: finalAmt,
+        otherCharges: parseFloat(invoiceData.otherCharges) || 0,
+        productPhoto: invoiceData.productPhoto || null,
         items: invoiceData.items.map(item => ({
           description: item.description,
           hsnCode: item.hsnCode,
@@ -300,7 +455,10 @@ const Invoice = () => {
           sgstRate: res.sgstRate,
           oldGoldWeight: res.oldGoldWeight,
           oldGoldRate: res.oldGoldWeight > 0 ? (res.oldGoldAmount / res.oldGoldWeight) : 0,
-          oldGoldAmount: res.oldGoldAmount
+          oldGoldAmount: res.oldGoldAmount,
+          otherCharges: res.otherCharges || 0,
+          productPhoto: res.productPhoto || null,
+          id: res.id
         });
         setShowPreview(true);
       }
@@ -585,7 +743,7 @@ const Invoice = () => {
 
             {/* Tax Rates & Invoice Totals */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                 <div>
                   <label className="form-label">CGST Rate (%)</label>
                   <input type="number" name="cgstRate" value={invoiceData.cgstRate}
@@ -596,9 +754,18 @@ const Invoice = () => {
                   <input type="number" name="sgstRate" value={invoiceData.sgstRate}
                     onChange={handleInputChange} className="form-input" step="0.01" />
                 </div>
+                <div>
+                  <label className="form-label">Other Charges (₹)</label>
+                  <input type="text" name="otherCharges" value={invoiceData.otherCharges}
+                    onChange={handleInputChange} className="form-input" placeholder="e.g. 100" />
+                </div>
               </div>
 
               <div style={{ background: 'var(--bg-elevated)', borderRadius: 10, padding: 14, border: '1px solid var(--border-subtle)' }}>
+                <TotalRow label="Items Subtotal" value={`₹${invoiceData.items.reduce((total, item) => total + Number(item.amount), 0).toLocaleString('en-IN')}`} />
+                {Number(invoiceData.otherCharges) > 0 && (
+                  <TotalRow label="Other Charges" value={`₹${Number(invoiceData.otherCharges).toLocaleString('en-IN')}`} />
+                )}
                 <TotalRow label="Subtotal Purchase" value={`₹${subTotal.toLocaleString('en-IN')}`} />
                 <TotalRow label={`CGST (${invoiceData.cgstRate}%)`} value={`₹${cgstAmount.toFixed(2)}`} />
                 <TotalRow label={`SGST (${invoiceData.sgstRate}%)`} value={`₹${sgstAmount.toFixed(2)}`} />
@@ -611,6 +778,8 @@ const Invoice = () => {
               </div>
             </div>
           </div>
+
+
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
             <button
@@ -665,6 +834,7 @@ const Invoice = () => {
                     <th>Subtotal</th>
                     <th>Deduction (Old Gold)</th>
                     <th>Final Total</th>
+                    <th>Product Photo</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -686,6 +856,88 @@ const Invoice = () => {
                       </td>
                       <td>
                         <strong style={{ color: '#4ade80' }}>₹{inv.finalAmount.toLocaleString('en-IN')}</strong>
+                      </td>
+                      <td>
+                        {(() => {
+                          const photosList = parseInvoicePhotos(inv.productPhoto);
+                          if (photosList.length > 0) {
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <div
+                                  style={{ display: 'flex', gap: 4, cursor: 'pointer' }}
+                                  onClick={() => {
+                                    setPhotoManagerInvoice(inv);
+                                    setShowPhotoManager(true);
+                                  }}
+                                  title="Click to manage photos"
+                                >
+                                  {photosList.slice(0, 3).map((p, idx) => (
+                                    <img
+                                      key={idx}
+                                      src={p}
+                                      alt={`product-${idx}`}
+                                      style={{
+                                        width: 28,
+                                        height: 28,
+                                        objectFit: 'cover',
+                                        borderRadius: 4,
+                                        border: '1px solid var(--border-subtle)'
+                                      }}
+                                    />
+                                  ))}
+                                  {photosList.length > 3 && (
+                                    <div style={{
+                                      width: 28,
+                                      height: 28,
+                                      borderRadius: 4,
+                                      background: 'var(--bg-elevated)',
+                                      border: '1px solid var(--border-subtle)',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: 10,
+                                      fontWeight: 'bold',
+                                      color: 'var(--text-secondary)'
+                                    }}>
+                                      +{photosList.length - 3}
+                                    </div>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  style={{ padding: '3px 6px', fontSize: 10, height: 26 }}
+                                  onClick={() => {
+                                    setPhotoManagerInvoice(inv);
+                                    setShowPhotoManager(true);
+                                  }}
+                                >
+                                  Manage
+                                </button>
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                style={{
+                                  padding: '4px 8px',
+                                  fontSize: 10,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4
+                                }}
+                                onClick={() => {
+                                  setPhotoManagerInvoice(inv);
+                                  setShowPhotoManager(true);
+                                }}
+                              >
+                                <span>📷 Add Photos</span>
+                              </button>
+                            );
+                          }
+                        })()}
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
@@ -789,6 +1041,13 @@ const Invoice = () => {
                         </tr>
                       );
                     })}
+                    {Number(invoiceData.otherCharges) > 0 && (
+                      <tr>
+                        <td style={{ border: '1px solid #000', padding: 6, textAlign: 'center' }}>{invoiceData.items.length + 1}</td>
+                        <td style={{ border: '1px solid #000', padding: 6 }} colSpan="7">Other Charges / Additions</td>
+                        <td style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>₹{Number(invoiceData.otherCharges).toLocaleString('en-IN')}</td>
+                      </tr>
+                    )}
                     <tr style={{ fontWeight: 'bold' }}>
                       <td colSpan="3" style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>Total Weight &amp; Subtotal:</td>
                       <td style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>
@@ -865,6 +1124,188 @@ const Invoice = () => {
                   </div>
                 </div>
               </div>
+
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PHOTOS MANAGER MODAL */}
+      {showPhotoManager && photoManagerInvoice && (
+        <div className="modal-overlay" style={{ zIndex: 12000 }}>
+          <div className="modal-box" style={{ maxWidth: 640 }}>
+            <div className="modal-header">
+              <div className="modal-title">✦ Reference Photos — Invoice #{photoManagerInvoice.invoiceNo}</div>
+              <button className="modal-close" onClick={() => { setShowPhotoManager(false); setPhotoManagerInvoice(null); }}>✕</button>
+            </div>
+            
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--bg-elevated)', padding: '12px 16px', borderRadius: 8, border: '1px solid var(--border-subtle)', fontSize: 13 }}>
+                <div><strong>Customer:</strong> {photoManagerInvoice.customerName}</div>
+                <div><strong>Date:</strong> {photoManagerInvoice.date}</div>
+              </div>
+
+              {photoManagerMessage && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  textAlign: 'center',
+                  background: photoManagerMessage.type === 'success' ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)',
+                  color: photoManagerMessage.type === 'success' ? '#4ade80' : '#f87171',
+                  border: photoManagerMessage.type === 'success' ? '1px solid rgba(74, 222, 128, 0.2)' : '1px solid rgba(248, 113, 113, 0.2)',
+                }}>
+                  {photoManagerMessage.text}
+                </div>
+              )}
+
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => handlePhotoUploadForInvoice(photoManagerInvoice.id, e.target.files[0])}
+                  style={{
+                    position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%', height: '100%'
+                  }}
+                  id="photo-manager-file-input"
+                />
+                <div style={{
+                  padding: '24px 20px',
+                  border: '2px dashed var(--border-strong)',
+                  borderRadius: 10,
+                  textAlign: 'center',
+                  color: 'var(--text-muted)',
+                  fontSize: 13,
+                  background: 'rgba(251,191,36,0.02)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 6,
+                  cursor: 'pointer'
+                }}>
+                  <span style={{ fontSize: 28 }}>📷</span>
+                  <span style={{ fontWeight: 600, color: 'var(--gold-300)' }}>Click to Upload/Add End Product Photo</span>
+                  <span>Supports multiple photos (Max 2MB per file)</span>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 12 }}>
+                  Uploaded Photos ({parseInvoicePhotos(photoManagerInvoice.productPhoto).length})
+                </div>
+                
+                {(() => {
+                  const photos = parseInvoicePhotos(photoManagerInvoice.productPhoto);
+                  if (photos.length === 0) {
+                    return (
+                      <div className="empty-state" style={{ padding: '30px 20px', border: '1px dashed var(--border-subtle)', borderRadius: 8 }}>
+                        <div className="empty-state-icon" style={{ fontSize: 32 }}>📸</div>
+                        <div className="empty-state-text">No reference photos uploaded yet.</div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 16 }}>
+                      {photos.map((p, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            background: 'var(--bg-elevated)',
+                            border: '1px solid var(--border-default)',
+                            borderRadius: 10,
+                            overflow: 'hidden',
+                            position: 'relative',
+                            display: 'flex',
+                            flexDirection: 'column'
+                          }}
+                        >
+                          <img
+                            src={p}
+                            alt={`Photo ${idx + 1}`}
+                            style={{
+                              width: '100%',
+                              height: 110,
+                              objectFit: 'cover',
+                              cursor: 'zoom-in'
+                            }}
+                            onClick={() => {
+                              const newWindow = window.open();
+                              newWindow.document.write(`<img src="${p}" style="max-width:100%; max-height:100%; display:block; margin:auto;" />`);
+                            }}
+                            title="Click to view full size"
+                          />
+                          <div style={{
+                            padding: '8px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            background: 'var(--bg-card)',
+                            borderTop: '1px solid var(--border-subtle)',
+                            minHeight: 34,
+                            alignItems: 'center'
+                          }}>
+                            {deletingPhotoIndex === idx ? (
+                              <div style={{ display: 'flex', width: '100%', gap: 4 }}>
+                                <button
+                                  type="button"
+                                  className="btn-danger"
+                                  style={{ padding: '4px 6px', fontSize: 9, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}
+                                  onClick={() => {
+                                    handlePhotoDeleteForInvoice(photoManagerInvoice.id, idx);
+                                    setDeletingPhotoIndex(null);
+                                  }}
+                                >
+                                  Delete?
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  style={{ padding: '4px 6px', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  onClick={() => setDeletingPhotoIndex(null)}
+                                >
+                                  No
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  style={{ padding: '4px 6px', fontSize: 10, flex: 1, marginRight: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  onClick={() => handleDownloadPhoto(p, idx, photoManagerInvoice.invoiceNo)}
+                                  title="Download to device"
+                                >
+                                  ⬇️ Save
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-danger"
+                                  style={{ padding: '4px 6px', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  onClick={() => setDeletingPhotoIndex(idx)}
+                                  title="Delete photo"
+                                >
+                                  🗑️
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => { setShowPhotoManager(false); setPhotoManagerInvoice(null); }}
+              >
+                Close Manager
+              </button>
             </div>
           </div>
         </div>

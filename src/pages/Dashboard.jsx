@@ -36,7 +36,7 @@ export default function Dashboard() {
   });
 
   const formattedTime = dateTime.toLocaleTimeString('en-US', {
-    hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'
+    hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit'
   });
 
   const gold22_8g = (rates.gold22 * 8).toLocaleString('en-IN');
