@@ -368,6 +368,85 @@ export default function SalesOrderPage() {
                 </div>
               </div>
 
+              {/* Gold/Metal Balance Calculations */}
+              {products.length > 0 && (() => {
+                const grouped = products.reduce((acc, p) => {
+                  if (!acc[p.type]) {
+                    acc[p.type] = { type: p.type, weight: 0 };
+                  }
+                  acc[p.type].weight += p.weight;
+                  return acc;
+                }, {});
+                const groupedList = Object.values(grouped);
+                const typesList = Object.keys(grouped);
+                const goldType = typesList.find(t => t.toLowerCase().includes('gold')) || typesList[0];
+
+                return (
+                  <div style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 10,
+                    padding: '12px 14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      ⚖️ Gold & Metal Balance Summary
+                    </div>
+                    {groupedList.map((item, idx) => {
+                      const type = item.type;
+                      const totalWeight = item.weight;
+                      const liveRate = getLiveRateForType(type);
+                      const convertedAdvance = liveRate > 0 ? (parseFloat(advanceAmount) || 0) / liveRate : 0;
+                      const appliedAdvanceGold = (type === goldType) ? (parseFloat(advanceGold) || 0) : 0;
+                      const totalAdvanceWeight = convertedAdvance + appliedAdvanceGold;
+                      const balanceWeight = totalWeight - totalAdvanceWeight;
+
+                      return (
+                        <div key={type} style={{
+                          borderTop: idx > 0 ? '1px solid var(--border-subtle)' : 'none',
+                          paddingTop: idx > 0 ? 10 : 0,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 4
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                            <span>{type} Total</span>
+                            <span>{totalWeight.toFixed(3)}g</span>
+                          </div>
+                          {(parseFloat(advanceAmount) > 0 && liveRate > 0) && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
+                              <span>Advance ₹{parseFloat(advanceAmount).toLocaleString('en-IN')} converted ({liveRate.toLocaleString('en-IN')}/g):</span>
+                              <span>{convertedAdvance.toFixed(3)}g</span>
+                            </div>
+                          )}
+                          {appliedAdvanceGold > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
+                              <span>Advance Metal Weight:</span>
+                              <span>{appliedAdvanceGold.toFixed(3)}g</span>
+                            </div>
+                          )}
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: balanceWeight > 0 ? 'var(--text-gold)' : '#4ade80',
+                            borderTop: '1px dashed var(--border-subtle)',
+                            paddingTop: 4,
+                            marginTop: 2
+                          }}>
+                            <span>Balance Weight to collect:</span>
+                            <span>{balanceWeight.toFixed(3)}g</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label className="form-label">Delivery Date *</label>
@@ -516,6 +595,86 @@ export default function SalesOrderPage() {
                   );
                 })}
               </div>
+
+              {/* Gold/Metal Balance Calculations */}
+              {(selectedOrder.products || []).length > 0 && (() => {
+                const grouped = selectedOrder.products.reduce((acc, p) => {
+                  if (!acc[p.type]) {
+                    acc[p.type] = { type: p.type, weight: 0 };
+                  }
+                  acc[p.type].weight += p.weight;
+                  return acc;
+                }, {});
+                const groupedList = Object.values(grouped);
+                const typesList = Object.keys(grouped);
+                const goldType = typesList.find(t => t.toLowerCase().includes('gold')) || typesList[0];
+
+                return (
+                  <div style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 10,
+                    padding: '12px 14px',
+                    marginTop: 14,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 10,
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      ⚖️ Gold & Metal Balance Summary
+                    </div>
+                    {groupedList.map((item, idx) => {
+                      const type = item.type;
+                      const totalWeight = item.weight;
+                      const liveRate = getLiveRateForType(type);
+                      const convertedAdvance = liveRate > 0 ? (selectedOrder.advanceAmount || 0) / liveRate : 0;
+                      const appliedAdvanceGold = (type === goldType) ? (selectedOrder.advanceGold || 0) : 0;
+                      const totalAdvanceWeight = convertedAdvance + appliedAdvanceGold;
+                      const balanceWeight = totalWeight - totalAdvanceWeight;
+
+                      return (
+                        <div key={type} style={{
+                          borderTop: idx > 0 ? '1px solid var(--border-subtle)' : 'none',
+                          paddingTop: idx > 0 ? 10 : 0,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 4
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                            <span>{type} Total</span>
+                            <span>{totalWeight.toFixed(3)}g</span>
+                          </div>
+                          {(selectedOrder.advanceAmount > 0 && liveRate > 0) && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
+                              <span>Advance ₹{selectedOrder.advanceAmount.toLocaleString('en-IN')} converted ({liveRate.toLocaleString('en-IN')}/g):</span>
+                              <span>{convertedAdvance.toFixed(3)}g</span>
+                            </div>
+                          )}
+                          {appliedAdvanceGold > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)' }}>
+                              <span>Advance Metal Weight:</span>
+                              <span>{appliedAdvanceGold.toFixed(3)}g</span>
+                            </div>
+                          )}
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: balanceWeight > 0 ? 'var(--text-gold)' : '#4ade80',
+                            borderTop: '1px dashed var(--border-subtle)',
+                            paddingTop: 4,
+                            marginTop: 2
+                          }}>
+                            <span>Balance Weight to collect:</span>
+                            <span>{balanceWeight.toFixed(3)}g</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
 
               {selectedOrder.notes && (
                 <div style={{ marginTop: 14 }}>
