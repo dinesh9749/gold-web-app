@@ -585,7 +585,7 @@ const Invoice = () => {
                 position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
                 background: 'var(--bg-elevated)', border: '1px solid var(--border-default)',
                 borderRadius: 8, overflow: 'hidden', maxHeight: 200, overflowY: 'auto',
-                boxShadow: '0 8px 16px rgba(0,0,0,0.5)'
+                boxShadow: '0 8px 16px rgba(30, 58, 138, 0.25)'
               }}>
                 {filteredCustomers.map(c => (
                   <div
@@ -982,7 +982,7 @@ const Invoice = () => {
               </div>
             </div>
 
-            <div className="modal-body" style={{ background: '#fff', color: '#000', padding: 36, fontFamily: 'serif' }}>
+            <div className="modal-body" style={{ background: '#fefce8', color: '#1e3a8a', padding: 36, fontFamily: 'serif' }}>
               <div id="invoice-preview">
                 {/* Print Invoice Header */}
                 <div style={{ textAlign: 'center', marginBottom: 20 }}>
@@ -995,12 +995,12 @@ const Invoice = () => {
                 </div>
 
                 {/* Consignee & Details Grid */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', border: '1px solid #000', padding: 12, marginBottom: 20, fontSize: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', border: '1px solid #1e3a8a', padding: 12, marginBottom: 20, fontSize: 12 }}>
                   <div>
                     <strong>Consignee Details:</strong>
                     <div style={{ marginTop: 4, fontWeight: 700 }}>{invoiceData.consignee}</div>
                     {invoiceData.customerId && (
-                      <div style={{ fontSize: 11, color: '#444' }}>Customer ID: #{invoiceData.customerId}</div>
+                      <div style={{ fontSize: 11, color: '#2563eb' }}>Customer ID: #{invoiceData.customerId}</div>
                     )}
                   </div>
                   <div style={{ textAlign: 'right' }}>
@@ -1010,18 +1010,18 @@ const Invoice = () => {
                 </div>
 
                 {/* Items Table */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20, fontSize: 12, border: '1px solid #000' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20, fontSize: 12, border: '1px solid #1e3a8a' }}>
                   <thead>
-                    <tr style={{ background: '#f5f5f5', borderBottom: '1px solid #000' }}>
-                      <th style={{ border: '1px solid #000', padding: 6, width: 30 }}>S.N</th>
-                      <th style={{ border: '1px solid #000', padding: 6, textAlign: 'left' }}>Description of Ornaments</th>
-                      <th style={{ border: '1px solid #000', padding: 6, width: 60 }}>HSN</th>
-                      <th style={{ border: '1px solid #000', padding: 6, textAlign: 'right', width: 70 }}>Net Wt (g)</th>
-                      <th style={{ border: '1px solid #000', padding: 6, textAlign: 'right', width: 60 }}>Wastage %</th>
-                      <th style={{ border: '1px solid #000', padding: 6, textAlign: 'right', width: 70 }}>Gross Wt</th>
-                      <th style={{ border: '1px solid #000', padding: 6, textAlign: 'right', width: 70 }}>Rate/g</th>
-                      <th style={{ border: '1px solid #000', padding: 6, textAlign: 'right', width: 70 }}>Making (₹)</th>
-                      <th style={{ border: '1px solid #000', padding: 6, textAlign: 'right', width: 90 }}>Amount (₹)</th>
+                    <tr style={{ background: '#fef9c3', borderBottom: '1px solid #1e3a8a' }}>
+                      <th style={{ border: '1px solid #1e3a8a', padding: 6, width: 30 }}>S.N</th>
+                      <th style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'left' }}>Description of Ornaments</th>
+                      <th style={{ border: '1px solid #1e3a8a', padding: 6, width: 60 }}>HSN</th>
+                      <th style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right', width: 70 }}>Net Wt (g)</th>
+                      <th style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right', width: 60 }}>Wastage %</th>
+                      <th style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right', width: 70 }}>Gross Wt</th>
+                      <th style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right', width: 70 }}>Rate/g</th>
+                      <th style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right', width: 70 }}>Making (₹)</th>
+                      <th style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right', width: 90 }}>Amount (₹)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1029,36 +1029,36 @@ const Invoice = () => {
                       const gross = item.netWeight * (1 + item.wastagePct / 100);
                       return (
                         <tr key={index}>
-                          <td style={{ border: '1px solid #000', padding: 6, textAlign: 'center' }}>{index + 1}</td>
-                          <td style={{ border: '1px solid #000', padding: 6 }}>{item.description}</td>
-                          <td style={{ border: '1px solid #000', padding: 6, textAlign: 'center' }}>{item.hsnCode}</td>
-                          <td style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>{Number(item.netWeight).toFixed(3)}g</td>
-                          <td style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>{item.wastagePct}%</td>
-                          <td style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>{gross.toFixed(3)}g</td>
-                          <td style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>₹{Number(item.rate).toLocaleString('en-IN')}</td>
-                          <td style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>₹{Number(item.makingCharges).toLocaleString('en-IN')}</td>
-                          <td style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>₹{Number(item.amount).toLocaleString('en-IN')}</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'center' }}>{index + 1}</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 6 }}>{item.description}</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'center' }}>{item.hsnCode}</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right' }}>{Number(item.netWeight).toFixed(3)}g</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right' }}>{item.wastagePct}%</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right' }}>{gross.toFixed(3)}g</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right' }}>₹{Number(item.rate).toLocaleString('en-IN')}</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right' }}>₹{Number(item.makingCharges).toLocaleString('en-IN')}</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right' }}>₹{Number(item.amount).toLocaleString('en-IN')}</td>
                         </tr>
                       );
                     })}
                     {Number(invoiceData.otherCharges) > 0 && (
                       <tr>
-                        <td style={{ border: '1px solid #000', padding: 6, textAlign: 'center' }}>{invoiceData.items.length + 1}</td>
-                        <td style={{ border: '1px solid #000', padding: 6 }} colSpan="7">Other Charges / Additions</td>
-                        <td style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>₹{Number(invoiceData.otherCharges).toLocaleString('en-IN')}</td>
+                        <td style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'center' }}>{invoiceData.items.length + 1}</td>
+                        <td style={{ border: '1px solid #1e3a8a', padding: 6 }} colSpan="7">Other Charges / Additions</td>
+                        <td style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right' }}>₹{Number(invoiceData.otherCharges).toLocaleString('en-IN')}</td>
                       </tr>
                     )}
                     <tr style={{ fontWeight: 'bold' }}>
-                      <td colSpan="3" style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>Total Weight &amp; Subtotal:</td>
-                      <td style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>
+                      <td colSpan="3" style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right' }}>Total Weight &amp; Subtotal:</td>
+                      <td style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right' }}>
                         {invoiceData.items.reduce((sum, i) => sum + (Number(i.netWeight) || 0), 0).toFixed(3)}g
                       </td>
-                      <td style={{ border: '1px solid #000' }}></td>
-                      <td style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>
+                      <td style={{ border: '1px solid #1e3a8a' }}></td>
+                      <td style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right' }}>
                         {invoiceData.items.reduce((sum, i) => sum + (Number(i.netWeight) * (1 + (Number(i.wastagePct) || 0) / 100)), 0).toFixed(3)}g
                       </td>
-                      <td colSpan="2" style={{ border: '1px solid #000' }}></td>
-                      <td style={{ border: '1px solid #000', padding: 6, textAlign: 'right' }}>₹{subTotal.toLocaleString('en-IN')}</td>
+                      <td colSpan="2" style={{ border: '1px solid #1e3a8a' }}></td>
+                      <td style={{ border: '1px solid #1e3a8a', padding: 6, textAlign: 'right' }}>₹{subTotal.toLocaleString('en-IN')}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1066,42 +1066,42 @@ const Invoice = () => {
                 {/* Taxes & Deductions Calculations Block */}
                 <div style={{ display: 'flex', gap: 14, marginBottom: 20, fontSize: 12 }}>
                   {/* Words */}
-                  <div style={{ flex: 1, border: '1px solid #000', padding: 10 }}>
+                  <div style={{ flex: 1, border: '1px solid #1e3a8a', padding: 10 }}>
                     <strong>Amount Chargeable in Words:</strong>
                     <div style={{ marginTop: 6, fontStyle: 'italic', fontWeight: 600 }}>{convertToWords(finalAmount)}</div>
                   </div>
                   
                   {/* Tax summary table */}
                   <div style={{ width: 320 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: 11 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #1e3a8a', fontSize: 11 }}>
                       <tbody>
                         <tr>
-                          <td style={{ border: '1px solid #000', padding: 4 }}>Subtotal Taxable</td>
-                          <td style={{ border: '1px solid #000', padding: 4, textAlign: 'right' }}>₹{subTotal.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 4 }}>Subtotal Taxable</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 4, textAlign: 'right' }}>₹{subTotal.toFixed(2)}</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid #000', padding: 4 }}>CGST ({invoiceData.cgstRate}%)</td>
-                          <td style={{ border: '1px solid #000', padding: 4, textAlign: 'right' }}>₹{cgstAmount.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 4 }}>CGST ({invoiceData.cgstRate}%)</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 4, textAlign: 'right' }}>₹{cgstAmount.toFixed(2)}</td>
                         </tr>
                         <tr>
-                          <td style={{ border: '1px solid #000', padding: 4 }}>SGST ({invoiceData.sgstRate}%)</td>
-                          <td style={{ border: '1px solid #000', padding: 4, textAlign: 'right' }}>₹{sgstAmount.toFixed(2)}</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 4 }}>SGST ({invoiceData.sgstRate}%)</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 4, textAlign: 'right' }}>₹{sgstAmount.toFixed(2)}</td>
                         </tr>
-                        <tr style={{ fontWeight: 'bold', background: '#f5f5f5' }}>
-                          <td style={{ border: '1px solid #000', padding: 4 }}>Grand Total</td>
-                          <td style={{ border: '1px solid #000', padding: 4, textAlign: 'right' }}>₹{grandTotal.toFixed(2)}</td>
+                        <tr style={{ fontWeight: 'bold', background: '#fef9c3' }}>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 4 }}>Grand Total</td>
+                          <td style={{ border: '1px solid #1e3a8a', padding: 4, textAlign: 'right' }}>₹{grandTotal.toFixed(2)}</td>
                         </tr>
                         {invoiceData.oldGoldAmount > 0 && (
                           <>
                             <tr>
-                              <td style={{ border: '1px solid #000', padding: 4, color: '#c00' }}>Old Gold Exchange (Deduction)</td>
-                              <td style={{ border: '1px solid #000', padding: 4, textAlign: 'right', color: '#c00' }}>
+                              <td style={{ border: '1px solid #1e3a8a', padding: 4, color: '#c00' }}>Old Gold Exchange (Deduction)</td>
+                              <td style={{ border: '1px solid #1e3a8a', padding: 4, textAlign: 'right', color: '#c00' }}>
                                 - ₹{Number(invoiceData.oldGoldAmount).toFixed(2)}
                               </td>
                             </tr>
-                            <tr style={{ fontWeight: 'bold', background: '#e8f5e9', fontSize: 12 }}>
-                              <td style={{ border: '1px solid #000', padding: 4 }}>Final Payable Amount</td>
-                              <td style={{ border: '1px solid #000', padding: 4, textAlign: 'right' }}>₹{finalAmount.toLocaleString('en-IN')}</td>
+                            <tr style={{ fontWeight: 'bold', background: '#fef9c3', fontSize: 12 }}>
+                              <td style={{ border: '1px solid #1e3a8a', padding: 4 }}>Final Payable Amount</td>
+                              <td style={{ border: '1px solid #1e3a8a', padding: 4, textAlign: 'right' }}>₹{finalAmount.toLocaleString('en-IN')}</td>
                             </tr>
                           </>
                         )}
@@ -1120,7 +1120,7 @@ const Invoice = () => {
                   </div>
                   <div style={{ textAlign: 'right', width: '30%' }}>
                     <p style={{ margin: 0 }}>For <strong>M S GOLD SMITH</strong></p>
-                    <p style={{ marginTop: 40, borderTop: '1px solid #000', display: 'inline-block', width: 140, paddingTop: 4 }}>Authorised Signatory</p>
+                    <p style={{ marginTop: 40, borderTop: '1px solid #1e3a8a', display: 'inline-block', width: 140, paddingTop: 4 }}>Authorised Signatory</p>
                   </div>
                 </div>
               </div>
