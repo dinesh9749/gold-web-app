@@ -34,10 +34,10 @@
   --border-default: rgba(217, 119, 6, 0.16);
   --border-strong:  rgba(217, 119, 6, 0.35);
 
-  /* Text -> Chocolate/Bronze and Gold text */
-  --text-primary:   #451a03;
-  --text-secondary: #78350f;
-  --text-muted:     #b45309;
+  /* Text -> Luxury Navy-Charcoal & Slate text */
+  --text-primary:   #0f172a;
+  --text-secondary: #334155;
+  --text-muted:     #64748b;
   --text-gold:      #d97706;
 
   /* Shadows -> Gold and warm bronze shadows */
@@ -965,7 +965,7 @@ body {
     font-family: 'Courier New', Courier, monospace !important;
     font-size: 11px !important;
     line-height: 1.3 !important;
-    color: #451a03 !important;
+    color: #0f172a !important;
     background: #fdfbf7 !important;
   }
 

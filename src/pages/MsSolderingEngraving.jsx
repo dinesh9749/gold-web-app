@@ -429,7 +429,7 @@ export default function MsSolderingEngraving() {
               {/* Paper Slip visual style */}
               <div style={{
                 background: '#fffdf5',
-                color: '#451a03',
+                color: '#0f172a',
                 width: '100%',
                 maxWidth: '280px',
                 padding: '20px 14px',
@@ -474,7 +474,7 @@ export default function MsSolderingEngraving() {
                       </td>
                     </tr>
                     <tr>
-                      <td style={{ paddingY: 3, color: '#78350f' }}>GST (5%)</td>
+                      <td style={{ paddingY: 3, color: '#334155' }}>GST (5%)</td>
                       <td style={{ paddingY: 3, textAlign: 'right' }}>{previewJob.gstAmount.toFixed(2)}</td>
                     </tr>
                     <tr style={{ fontWeight: 'bold', borderTop: '1px dashed #b45309' }}>
@@ -490,7 +490,7 @@ export default function MsSolderingEngraving() {
 
                 <div style={{ textAlign: 'center', fontSize: 9 }}>
                   <p style={{ margin: '2px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
-                  <p style={{ margin: '2px 0', color: '#78350f' }}>M.S. Gold Jewellery ERP</p>
+                  <p style={{ margin: '2px 0', color: '#334155' }}>M.S. Gold Jewellery ERP</p>
                 </div>
               </div>
             </div>

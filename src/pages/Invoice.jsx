@@ -982,7 +982,7 @@ const Invoice = () => {
               </div>
             </div>
 
-            <div className="modal-body" style={{ background: '#fffdf5', color: '#451a03', padding: 36, fontFamily: 'serif' }}>
+            <div className="modal-body" style={{ background: '#fffdf5', color: '#0f172a', padding: 36, fontFamily: 'serif' }}>
               <div id="invoice-preview">
                 {/* Print Invoice Header */}
                 <div style={{ textAlign: 'center', marginBottom: 20 }}>
@@ -1000,7 +1000,7 @@ const Invoice = () => {
                     <strong>Consignee Details:</strong>
                     <div style={{ marginTop: 4, fontWeight: 700 }}>{invoiceData.consignee}</div>
                     {invoiceData.customerId && (
-                      <div style={{ fontSize: 11, color: '#78350f' }}>Customer ID: #{invoiceData.customerId}</div>
+                      <div style={{ fontSize: 11, color: '#334155' }}>Customer ID: #{invoiceData.customerId}</div>
                     )}
                   </div>
                   <div style={{ textAlign: 'right' }}>
