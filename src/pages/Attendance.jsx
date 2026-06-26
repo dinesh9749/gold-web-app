@@ -158,7 +158,7 @@ export default function AttendancePage() {
                         padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
                         border: 'none', cursor: 'pointer', transition: 'all 0.15s',
                         background: tab === t.id ? 'linear-gradient(135deg, #fbbf24, #d97706)' : 'var(--bg-elevated)',
-                        color: tab === t.id ? '#1e3a8a' : 'var(--text-secondary)',
+                        color: tab === t.id ? '#ffffff' : 'var(--text-secondary)',
                     }}>{t.label}</button>
                 ))}
             </div>
@@ -322,7 +322,7 @@ export default function AttendancePage() {
                                                         padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: 'pointer',
                                                         background: row.saved ? 'rgba(74,222,128,0.15)' : 'linear-gradient(135deg,#fbbf24,#d97706)',
                                                         border: row.saved ? '1px solid #4ade80' : 'none',
-                                                        color: row.saved ? '#4ade80' : '#1e3a8a', transition: 'all 0.15s',
+                                                        color: row.saved ? '#4ade80' : '#ffffff', transition: 'all 0.15s',
                                                     }}>
                                                         {savingRows[row.employeeId] ? '…' : row.saved ? '✓' : 'Save'}
                                                     </button>

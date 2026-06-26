@@ -155,8 +155,8 @@ const GoldSilverRateInput = () => {
                 <>
                   <div style={{
                     width: 14, height: 14, borderRadius: '50%',
-                    border: '2px solid rgba(30,58,138,0.2)',
-                    borderTop: '2px solid #1e3a8a',
+                    border: '2px solid rgba(255,255,255,0.2)',
+                    borderTop: '2px solid #ffffff',
                     animation: 'spin 0.8s linear infinite',
                   }} />
                   Saving…

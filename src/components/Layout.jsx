@@ -239,7 +239,7 @@ function Layout() {
               justifyContent: 'center',
               fontSize: 12,
               fontWeight: 700,
-              color: '#1e3a8a',
+              color: '#ffffff',
               flexShrink: 0,
             }}>{isAdmin ? "A" : "S"}</div>
             <div>

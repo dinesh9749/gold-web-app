@@ -340,7 +340,7 @@ export default function EmployeeSetup() {
                                                 <input type="time" value={editShift.shiftEnd}
                                                     onChange={e => setEditShift(p => ({ ...p, shiftEnd: e.target.value }))}
                                                     className="form-input" style={{ padding: '4px 8px', fontSize: 12, width: 100 }} />
-                                                <button onClick={saveShift} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: 'linear-gradient(135deg,#fbbf24,#d97706)', border: 'none', cursor: 'pointer', color: '#1e3a8a' }}>✓</button>
+                                                <button onClick={saveShift} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: 'linear-gradient(135deg,#fbbf24,#d97706)', border: 'none', cursor: 'pointer', color: '#ffffff' }}>✓</button>
                                                 <button onClick={() => setEditShift(null)} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 12, background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', cursor: 'pointer', color: 'var(--text-secondary)' }}>✕</button>
                                             </div>
                                         ) : (

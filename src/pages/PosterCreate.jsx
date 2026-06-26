@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 
 // Default Gold Logo SVG
 const DefaultLogoSVG = ({ color }) => (
-  <svg viewBox="0 0 100 100" width="48" height="48" style={{ filter: 'drop-shadow(0 2px 4px rgba(30,58,138,0.15))' }}>
+  <svg viewBox="0 0 100 100" width="48" height="48" style={{ filter: 'drop-shadow(0 2px 4px rgba(217,119,6,0.15))' }}>
     <defs>
       <linearGradient id="logo-gold" x1="0%" y1="0%" x2="100%" y2="100%">
         <stop offset="0%" stopColor="#fffbeb" />
@@ -32,7 +32,7 @@ const DefaultEarringSVG = () => (
         <stop offset="100%" stopColor="#b45309" />
       </radialGradient>
       <filter id="svg-shadow" x="-15%" y="-15%" width="130%" height="130%">
-        <feDropShadow dx="0" dy="6" stdDeviation="5" floodColor="#1e3a8a" floodOpacity="0.2" />
+        <feDropShadow dx="0" dy="6" stdDeviation="5" floodColor="#b45309" floodOpacity="0.2" />
       </filter>
     </defs>
     <rect x="25" y="25" width="150" height="150" rx="22" fill="url(#box-grad)" filter="url(#svg-shadow)" stroke="#ffffff" strokeWidth="2" />
@@ -625,7 +625,7 @@ export default function PosterCreate() {
               position: 'relative',
               borderRadius: 4,
               overflow: 'hidden',
-              boxShadow: '0 20px 50px rgba(30, 58, 138, 0.25)',
+              boxShadow: '0 20px 50px rgba(146, 64, 14, 0.15)',
               boxSizing: 'border-box',
               ...canvasStyle
             }}
@@ -681,7 +681,7 @@ export default function PosterCreate() {
                       maxWidth: '100%', 
                       maxHeight: '100%', 
                       objectFit: 'contain',
-                      filter: 'drop-shadow(0 10px 20px rgba(30,58,138,0.18))' 
+                      filter: 'drop-shadow(0 10px 20px rgba(217,119,6,0.18))' 
                     }} 
                   />
                 ) : (
@@ -720,7 +720,7 @@ export default function PosterCreate() {
                 fontWeight: 700,
                 color: textColor,
                 background: cardBg,
-                boxShadow: 'inset 0 1px 3px rgba(30,58,138,0.05)',
+                boxShadow: 'inset 0 1px 3px rgba(217,119,6,0.05)',
                 marginTop: 2
               }}>
                 {dateStr}
@@ -755,7 +755,7 @@ export default function PosterCreate() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  boxShadow: '0 4px 10px rgba(30, 58, 138, 0.06)'
+                  boxShadow: '0 4px 10px rgba(217, 119, 6, 0.06)'
                 }}>
                   <div style={{ 
                     width: 32, 
@@ -789,7 +789,7 @@ export default function PosterCreate() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  boxShadow: '0 4px 10px rgba(30, 58, 138, 0.06)'
+                  boxShadow: '0 4px 10px rgba(217, 119, 6, 0.06)'
                 }}>
                   <div style={{ 
                     width: 32, 
@@ -825,7 +825,7 @@ export default function PosterCreate() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                boxShadow: '0 4px 12px rgba(30, 58, 138, 0.08)'
+                boxShadow: '0 4px 12px rgba(217, 119, 6, 0.08)'
               }}>
                 <div className="poster-font-title" style={{ fontSize: 13, fontWeight: 700, color: textColor, letterSpacing: 0.8 }}>8 GRAMS</div>
                 <div className="poster-font-serif" style={{ fontSize: 22, fontWeight: 800, color: textColor.startsWith('#fff') || textColor.startsWith('#f8') ? textColor : '#991b1b', textShadow: '0 1px 1px rgba(255,255,255,0.1)' }}>

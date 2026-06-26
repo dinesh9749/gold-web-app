@@ -428,12 +428,12 @@ export default function MsSolderingEngraving() {
             }}>
               {/* Paper Slip visual style */}
               <div style={{
-                background: '#fefce8',
-                color: '#1e3a8a',
+                background: '#fffdf5',
+                color: '#451a03',
                 width: '100%',
                 maxWidth: '280px',
                 padding: '20px 14px',
-                boxShadow: '0 4px 20px rgba(30, 58, 138, 0.15)',
+                boxShadow: '0 4px 20px rgba(217, 119, 6, 0.15)',
                 border: '1px solid var(--border-default)',
                 fontFamily: 'Courier New, Courier, monospace',
                 fontSize: '12px',
@@ -445,7 +445,7 @@ export default function MsSolderingEngraving() {
                   <p style={{ margin: '2px 0', fontSize: 10 }}>Srivilliputhur, Virudhunagar - 626 125.</p>
                   <p style={{ margin: '2px 0', fontSize: 10 }}><strong>GSTIN:</strong> 33BDVPR1363J1Z2</p>
                   <p style={{ margin: '2px 0', fontSize: 10 }}><strong>Mobile:</strong> 94431 12034</p>
-                  <div style={{ margin: '8px 0 6px 0', borderBottom: '1px dashed #1e3a8a' }} />
+                  <div style={{ margin: '8px 0 6px 0', borderBottom: '1px dashed #b45309' }} />
                   <h3 style={{ margin: '0', fontSize: 12, fontWeight: 'bold', letterSpacing: '1px' }}>SOLDERING &amp; ENGRAVING</h3>
                 </div>
 
@@ -455,11 +455,11 @@ export default function MsSolderingEngraving() {
                   <div><strong>Customer:</strong> {previewJob.customerName}</div>
                 </div>
 
-                <div style={{ borderBottom: '1px dashed #1e3a8a', marginBottom: 8 }} />
+                <div style={{ borderBottom: '1px dashed #b45309', marginBottom: 8 }} />
 
                 <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginBottom: 8 }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px dashed #1e3a8a' }}>
+                    <tr style={{ borderBottom: '1px dashed #b45309' }}>
                       <th style={{ textAlign: 'left', paddingBottom: 4 }}>Description</th>
                       <th style={{ textAlign: 'right', paddingBottom: 4 }}>Amount (₹)</th>
                     </tr>
@@ -474,10 +474,10 @@ export default function MsSolderingEngraving() {
                       </td>
                     </tr>
                     <tr>
-                      <td style={{ paddingY: 3, color: '#2563eb' }}>GST (5%)</td>
+                      <td style={{ paddingY: 3, color: '#78350f' }}>GST (5%)</td>
                       <td style={{ paddingY: 3, textAlign: 'right' }}>{previewJob.gstAmount.toFixed(2)}</td>
                     </tr>
-                    <tr style={{ fontWeight: 'bold', borderTop: '1px dashed #1e3a8a' }}>
+                    <tr style={{ fontWeight: 'bold', borderTop: '1px dashed #b45309' }}>
                       <td style={{ paddingTop: 6 }}>Net Amount</td>
                       <td style={{ paddingTop: 6, textAlign: 'right', fontSize: 13 }}>
                         ₹{previewJob.totalAmount.toFixed(2)}
@@ -486,11 +486,11 @@ export default function MsSolderingEngraving() {
                   </tbody>
                 </table>
 
-                <div style={{ borderBottom: '1px dashed #1e3a8a', marginTop: 10, marginBottom: 10 }} />
+                <div style={{ borderBottom: '1px dashed #b45309', marginTop: 10, marginBottom: 10 }} />
 
                 <div style={{ textAlign: 'center', fontSize: 9 }}>
                   <p style={{ margin: '2px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
-                  <p style={{ margin: '2px 0', color: '#2563eb' }}>M.S. Gold Jewellery ERP</p>
+                  <p style={{ margin: '2px 0', color: '#78350f' }}>M.S. Gold Jewellery ERP</p>
                 </div>
               </div>
             </div>
@@ -506,7 +506,7 @@ export default function MsSolderingEngraving() {
             <p style={{ margin: '1px 0', fontSize: 8 }}>No.37C, Chettiyakudi South Street, Nadaga Salai,</p>
             <p style={{ margin: '1px 0', fontSize: 8 }}>Srivilliputhur, Virudhunagar - 626 125.</p>
             <p style={{ margin: '1px 0', fontSize: 8 }}>GSTIN: 33BDVPR1363J1Z2 | Ph: 94431 12034</p>
-            <div style={{ margin: '6px 0', borderBottom: '1px dashed #1e3a8a' }} />
+            <div style={{ margin: '6px 0', borderBottom: '1px dashed #b45309' }} />
             <h3 style={{ margin: '0', fontSize: 10, fontWeight: 'bold' }}>SOLDERING &amp; ENGRAVING</h3>
           </div>
 
@@ -516,11 +516,11 @@ export default function MsSolderingEngraving() {
             <div><strong>Customer:</strong> {previewJob.customerName}</div>
           </div>
 
-          <div style={{ borderBottom: '1px dashed #1e3a8a', marginBottom: 6 }} />
+          <div style={{ borderBottom: '1px dashed #b45309', marginBottom: 6 }} />
 
           <table style={{ width: '100%', fontSize: 8, borderCollapse: 'collapse', marginBottom: 6 }}>
             <thead>
-              <tr style={{ borderBottom: '1px dashed #1e3a8a' }}>
+              <tr style={{ borderBottom: '1px dashed #b45309' }}>
                 <th style={{ textAlign: 'left', paddingBottom: 2 }}>Description</th>
                 <th style={{ textAlign: 'right', paddingBottom: 2 }}>Amount (₹)</th>
               </tr>
@@ -534,14 +534,14 @@ export default function MsSolderingEngraving() {
                 <td style={{ paddingY: 2 }}>GST (5%)</td>
                 <td style={{ paddingY: 2, textAlign: 'right' }}>{previewJob.gstAmount.toFixed(2)}</td>
               </tr>
-              <tr style={{ fontWeight: 'bold', borderTop: '1px dashed #1e3a8a' }}>
+              <tr style={{ fontWeight: 'bold', borderTop: '1px dashed #b45309' }}>
                 <td style={{ paddingTop: 4 }}>Net Total</td>
                 <td style={{ paddingTop: 4, textAlign: 'right' }}>₹{previewJob.totalAmount.toFixed(2)}</td>
               </tr>
             </tbody>
           </table>
 
-          <div style={{ borderBottom: '1px dashed #1e3a8a', marginTop: 6, marginBottom: 8 }} />
+          <div style={{ borderBottom: '1px dashed #b45309', marginTop: 6, marginBottom: 8 }} />
 
           <div style={{ textAlign: 'center', fontSize: 7 }}>
             <p style={{ margin: '1px 0' }}>Thank you! Visit again!</p>
