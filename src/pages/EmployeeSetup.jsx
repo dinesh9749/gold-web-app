@@ -11,7 +11,7 @@ const emptyForm = () => ({
 
 export default function EmployeeSetup() {
     const outletContext = useOutletContext();
-    const isAdmin = outletContext ? outletContext.isAdmin : (localStorage.getItem("goldApp_adminMode") !== "false");
+    const isAdmin = true;
     const [employees, setEmployees] = useState([]);
     const [roles, setRoles] = useState([]);
     const [showForm, setShowForm] = useState(false);
@@ -83,10 +83,6 @@ export default function EmployeeSetup() {
     };
 
     const deleteEmployee = async (id, name) => {
-        if (!isAdmin) {
-            alert("Access Denied: Staff mode is active. Deleting employees requires Admin passcode.");
-            return;
-        }
         if (!window.confirm(`Delete ${name}? All attendance records will be removed.`)) return;
         try {
             await window.electronAPI?.deleteEmployee(id);
@@ -107,10 +103,6 @@ export default function EmployeeSetup() {
     };
 
     const deleteRole = async (roleId, roleName) => {
-        if (!isAdmin) {
-            alert("Access Denied: Staff mode is active. Deleting roles requires Admin passcode.");
-            return;
-        }
         if (!window.confirm(`Remove role "${roleName}"?`)) return;
         try {
             await window.electronAPI?.deleteRole(roleId);

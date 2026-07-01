@@ -4,7 +4,7 @@ import { Printer, Save, Trash, Eye, Sparkles } from 'lucide-react';
 
 export default function MsSolderingEngraving() {
   const outletContext = useOutletContext();
-  const isAdmin = outletContext ? outletContext.isAdmin : (localStorage.getItem("goldApp_adminMode") !== "false");
+  const isAdmin = true;
   
   const [activeTab, setActiveTab] = useState("generator"); // "generator" or "history"
   const [loading, setLoading] = useState(false);
@@ -113,11 +113,6 @@ export default function MsSolderingEngraving() {
   };
 
   const handleDelete = async (id) => {
-    if (!isAdmin) {
-      alert("Admin Access Required. Please unlock Admin Mode from the top bar.");
-      return;
-    }
-
     if (window.confirm("Are you sure you want to delete this job record permanently?")) {
       try {
         await window.electronAPI?.deleteSolderingJob(id);

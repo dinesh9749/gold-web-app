@@ -120,51 +120,9 @@ function Layout() {
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  const [isAdmin, setIsAdmin] = useState(() => {
-    return localStorage.getItem("goldApp_adminMode") !== "false";
-  });
-  const [showPasscodeModal, setShowPasscodeModal] = useState(false);
-  const [passcodeVal, setPasscodeVal] = useState("");
-  const [passcodeError, setPasscodeError] = useState("");
-
-  const handleToggleMode = () => {
-    const passcode = localStorage.getItem("goldApp_adminPasscode");
-    if (isAdmin) {
-      setIsAdmin(false);
-      localStorage.setItem("goldApp_adminMode", "false");
-    } else {
-      if (!passcode) {
-        setIsAdmin(true);
-        localStorage.setItem("goldApp_adminMode", "true");
-        alert("Unlocked Admin Mode. Note: You can set a passcode in Settings to lock staff access.");
-      } else {
-        setPasscodeVal("");
-        setPasscodeError("");
-        setShowPasscodeModal(true);
-      }
-    }
-  };
-
-  const handleVerifyPasscode = (e) => {
-    e.preventDefault();
-    const storedPasscode = localStorage.getItem("goldApp_adminPasscode");
-    if (passcodeVal === storedPasscode) {
-      setIsAdmin(true);
-      localStorage.setItem("goldApp_adminMode", "true");
-      setShowPasscodeModal(false);
-      setPasscodeVal("");
-      setPasscodeError("");
-    } else {
-      setPasscodeError("Invalid passcode PIN. Please try again.");
-    }
-  };
-
-  if (!isAdmin && (currentPath === 'settings' || currentPath === 'rateinput')) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  const mainMenu = navItems.slice(0, 4).filter(item => isAdmin || item.to.toLowerCase() !== '/rateinput');
-  const managementMenu = navItems.slice(4).filter(item => isAdmin || item.to.toLowerCase() !== '/settings');
+  const isAdmin = true;
+  const mainMenu = navItems.slice(0, 4);
+  const managementMenu = navItems.slice(4);
 
   return (
     <div className={`app-layout ${isMobileSidebarOpen ? 'sidebar-open' : ''}`}>
@@ -268,31 +226,9 @@ function Layout() {
             {pageTitle}
           </div>
           <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {/* Lock Mode Switcher Button */}
-            <button
-              onClick={handleToggleMode}
-              style={{
-                background: isAdmin ? 'rgba(34, 197, 94, 0.1)' : 'rgba(251, 191, 36, 0.1)',
-                border: `1px solid ${isAdmin ? 'rgba(34, 197, 94, 0.3)' : 'rgba(251, 191, 36, 0.3)'}`,
-                color: isAdmin ? '#4ade80' : 'var(--gold-300)',
-                padding: '6px 14px',
-                borderRadius: '8px',
-                fontSize: '12px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s',
-              }}
-            >
-              <span>{isAdmin ? '🔓' : '🔒'}</span>
-              <span>{isAdmin ? 'Admin Mode' : 'Staff Mode'}</span>
-            </button>
-
             <span className="topbar-badge">✦ M.S. Gold</span>
-            <div className="topbar-avatar" title={isAdmin ? "Administrator Mode" : "Staff Mode"}>
-              {isAdmin ? "A" : "S"}
+            <div className="topbar-avatar" title="Administrator Mode">
+              A
             </div>
           </div>
         </header>
@@ -302,49 +238,6 @@ function Layout() {
           <Outlet context={{ isAdmin }} />
         </main>
       </div>
-
-      {/* PASSCODE PROMPT MODAL */}
-      {showPasscodeModal && (
-        <div className="modal-overlay" style={{ zIndex: 10000 }}>
-          <div className="modal-box" style={{ maxWidth: 360, padding: '20px' }}>
-            <div className="modal-header" style={{ padding: '0 0 12px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-              <div className="modal-title">✦ Enter Admin Passcode</div>
-              <button className="modal-close" onClick={() => setShowPasscodeModal(false)}>✕</button>
-            </div>
-            <div className="modal-body" style={{ padding: '16px 0 0 0' }}>
-              <form onSubmit={handleVerifyPasscode}>
-                <div style={{ marginBottom: 16 }}>
-                  <label className="form-label" style={{ fontSize: 11, textAlign: 'center', display: 'block' }}>Enter 4-Digit PIN</label>
-                  <input
-                    type="password"
-                    maxLength={4}
-                    className="form-input"
-                    style={{ textAlign: 'center', fontSize: 24, letterSpacing: 10, fontFamily: 'monospace' }}
-                    value={passcodeVal}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val === "" || /^[0-9]+$/.test(val)) {
-                        setPasscodeVal(val);
-                      }
-                    }}
-                    autoFocus
-                    required
-                  />
-                  {passcodeError && (
-                    <div style={{ color: '#f87171', fontSize: 12, marginTop: 8, textAlign: 'center', fontWeight: 600 }}>
-                      ⚠️ {passcodeError}
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                  <button type="button" className="btn-secondary" onClick={() => setShowPasscodeModal(false)}>Cancel</button>
-                  <button type="submit" className="btn-primary">Verify</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 
 const CustomerViewPage = () => {
   const outletContext = useOutletContext();
-  const isAdmin = outletContext ? outletContext.isAdmin : (localStorage.getItem("goldApp_adminMode") !== "false");
+  const isAdmin = true;
   const [showModal, setShowModal] = useState(false);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -68,10 +68,6 @@ const CustomerViewPage = () => {
   };
 
   const handleDeleteCustomer = async (id) => {
-    if (!isAdmin) {
-      alert("Access Denied: Staff mode is active. Deleting customers requires Admin passcode.");
-      return;
-    }
     if (window.confirm('Delete this customer?')) {
       try {
         await window.electronAPI?.deleteCustomer(id);

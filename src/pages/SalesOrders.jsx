@@ -4,7 +4,7 @@ import { useOutletContext } from 'react-router-dom';
 
 export default function SalesOrderPage() {
   const outletContext = useOutletContext();
-  const isAdmin = outletContext ? outletContext.isAdmin : (localStorage.getItem("goldApp_adminMode") !== "false");
+  const isAdmin = true;
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -114,10 +114,6 @@ export default function SalesOrderPage() {
   };
 
   const handleDeleteOrder = async (orderId) => {
-    if (!isAdmin) {
-      alert("Access Denied: Staff mode is active. Deleting orders requires Admin passcode.");
-      return;
-    }
     if (window.confirm('Delete this order?')) {
       try {
         await window.electronAPI?.deleteSalesOrder(orderId);

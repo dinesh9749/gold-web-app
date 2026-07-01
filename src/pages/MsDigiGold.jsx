@@ -3,7 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 
 function MsDigiGold() {
   const outletContext = useOutletContext();
-  const isAdmin = outletContext ? outletContext.isAdmin : (localStorage.getItem("goldApp_adminMode") !== "false");
+  const isAdmin = true;
 
   const [schemes, setSchemes] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -180,10 +180,6 @@ function MsDigiGold() {
   };
 
   const handleDeleteCollection = async (collectionId) => {
-    if (!isAdmin) {
-      alert("Access Denied: Staff mode is active. Deleting collections requires Admin passcode.");
-      return;
-    }
     if (!window.confirm('Are you sure you want to delete this collection entry?')) return;
     try {
       await window.electronAPI.deleteGoldCollection(collectionId);
@@ -211,10 +207,6 @@ function MsDigiGold() {
   };
 
   const handleDeleteScheme = async (schemeId) => {
-    if (!isAdmin) {
-      alert("Access Denied: Staff mode is active. Deleting gold schemes requires Admin passcode.");
-      return;
-    }
     if (!window.confirm('Deleting this scheme will delete all its recorded collections too. Proceed?')) return;
     try {
       await window.electronAPI.deleteGoldScheme(schemeId);

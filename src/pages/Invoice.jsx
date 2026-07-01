@@ -4,7 +4,7 @@ import { useOutletContext } from "react-router-dom";
 
 const Invoice = () => {
   const outletContext = useOutletContext();
-  const isAdmin = outletContext ? outletContext.isAdmin : (localStorage.getItem("goldApp_adminMode") !== "false");
+  const isAdmin = true;
   const [activeTab, setActiveTab] = useState("generator"); // "generator" or "history"
   const [customers, setCustomers] = useState([]);
   const [liveGoldRate, setLiveGoldRate] = useState(0);
@@ -416,11 +416,6 @@ const Invoice = () => {
   };
 
   const handleDeleteInvoice = async (id) => {
-    if (!isAdmin) {
-      alert("Admin Access Required. Please unlock Admin Mode from the top bar.");
-      return;
-    }
-
     if (window.confirm("Are you sure you want to delete this invoice permanently?")) {
       try {
         await window.electronAPI?.deleteInvoice(id);
