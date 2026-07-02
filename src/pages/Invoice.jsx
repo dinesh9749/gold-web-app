@@ -44,6 +44,7 @@ const Invoice = () => {
         hsnCode: "7113",
         netWeight: 5.0,
         wastagePct: 10,  // 10% standard wastage
+        stoneWeight: 0,
         rate: 6500,
         makingCharges: 500,
         amount: 36250,
@@ -79,7 +80,13 @@ const Invoice = () => {
         setInvoiceData(prev => {
           const newItems = [...prev.items];
           newItems[0].rate = rate;
-          newItems[0].amount = calculateItemAmount(newItems[0].netWeight, newItems[0].wastagePct, rate, newItems[0].makingCharges);
+          newItems[0].amount = calculateItemAmount(
+            newItems[0].netWeight,
+            newItems[0].wastagePct,
+            rate,
+            newItems[0].makingCharges,
+            newItems[0].stoneWeight
+          );
           return { ...prev, items: newItems };
         });
       }
@@ -113,13 +120,14 @@ const Invoice = () => {
     }
   };
 
-  const calculateItemAmount = (netWeight, wastagePct, rate, makingCharges) => {
+  const calculateItemAmount = (netWeight, wastagePct, rate, makingCharges, stoneWeight = 0) => {
     const nw = Number(netWeight) || 0;
     const wp = Number(wastagePct) || 0;
     const r = Number(rate) || 0;
     const mc = Number(makingCharges) || 0;
+    const sw = Number(stoneWeight) || 0;
 
-    const grossWeight = nw * (1 + wp / 100);
+    const grossWeight = Math.max(0, nw * (1 + wp / 100) - sw);
     const amt = (grossWeight * r) + mc;
     return Math.round(amt * 100) / 100;
   };
@@ -310,7 +318,8 @@ const Invoice = () => {
       item.netWeight,
       item.wastagePct,
       item.rate,
-      item.makingCharges
+      item.makingCharges,
+      item.stoneWeight
     );
 
     setInvoiceData((prev) => ({ ...prev, items: newItems }));
@@ -326,6 +335,7 @@ const Invoice = () => {
           hsnCode: "7113",
           netWeight: 0,
           wastagePct: 0,
+          stoneWeight: 0,
           rate: liveGoldRate || 6500,
           makingCharges: 0,
           amount: 0,
@@ -387,6 +397,7 @@ const Invoice = () => {
           hsnCode: item.hsnCode,
           netWeight: parseFloat(item.netWeight) || 0,
           wastagePct: parseFloat(item.wastagePct) || 0,
+          stoneWeight: parseFloat(item.stoneWeight) || 0,
           makingCharges: parseFloat(item.makingCharges) || 0,
           ratePerGram: parseFloat(item.rate) || 0,
           amount: parseFloat(item.amount) || 0
@@ -442,6 +453,7 @@ const Invoice = () => {
             hsnCode: i.hsnCode,
             netWeight: i.netWeight,
             wastagePct: i.wastagePct,
+            stoneWeight: i.stoneWeight || 0,
             rate: i.ratePerGram,
             makingCharges: i.makingCharges,
             amount: i.amount
@@ -613,7 +625,7 @@ const Invoice = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-elevated)' }}>
-                    {['#', 'Ornaments Description', 'HSN', 'Net Wt (g)', 'Wastage %', 'Gross Wt', 'Rate/g', 'Making (₹)', 'Amount', ''].map(h => (
+                    {['#', 'Ornaments Description', 'HSN', 'Net Wt (g)', 'Wastage %', 'Stone Wt (g)', 'Gross Wt', 'Rate/g', 'Making (₹)', 'Amount', ''].map(h => (
                       <th key={h} style={{
                         padding: '8px 10px', textAlign: 'left', fontSize: 9,
                         fontWeight: 700, letterSpacing: 0.8, textTransform: 'uppercase',
@@ -624,7 +636,7 @@ const Invoice = () => {
                 </thead>
                 <tbody>
                   {invoiceData.items.map((item, index) => {
-                    const gross = item.netWeight * (1 + item.wastagePct / 100);
+                    const gross = Math.max(0, item.netWeight * (1 + item.wastagePct / 100) - (Number(item.stoneWeight) || 0));
                     return (
                       <tr key={index} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                         <td style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-muted)' }}>{index + 1}</td>
@@ -657,6 +669,16 @@ const Invoice = () => {
                               }
                             }}
                             className="form-input" style={{ padding: '6px 10px', fontSize: 12, width: 65 }} />
+                        </td>
+                        <td style={{ padding: '4px 6px' }}>
+                          <input type="text" value={item.stoneWeight !== undefined ? item.stoneWeight : ''}
+                            onChange={e => {
+                              const val = e.target.value;
+                              if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
+                                handleItemChange(index, 'stoneWeight', val);
+                              }
+                            }}
+                            className="form-input" style={{ padding: '6px 10px', fontSize: 12, width: 70 }} />
                         </td>
                         <td style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-secondary)' }}>
                           {gross.toFixed(3)}g
@@ -1013,6 +1035,7 @@ const Invoice = () => {
                       <th style={{ border: '1px solid #b45309', padding: 6, width: 60 }}>HSN</th>
                       <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 70 }}>Net Wt (g)</th>
                       <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 60 }}>Wastage %</th>
+                      <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 65 }}>Stone Wt (g)</th>
                       <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 70 }}>Gross Wt</th>
                       <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 70 }}>Rate/g</th>
                       <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 70 }}>Making (₹)</th>
@@ -1021,25 +1044,26 @@ const Invoice = () => {
                   </thead>
                   <tbody>
                     {invoiceData.items.map((item, index) => {
-                      const gross = item.netWeight * (1 + item.wastagePct / 100);
+                      const gross = Math.max(0, item.netWeight * (1 + item.wastagePct / 100) - (Number(item.stoneWeight) || 0));
                       return (
                         <tr key={index}>
                           <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'center' }}>{index + 1}</td>
-                          <td style={{ border: '1px solid #b45309', padding: 6 }}>{item.description}</td>
-                          <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'center' }}>{item.hsnCode}</td>
-                          <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{Number(item.netWeight).toFixed(3)}g</td>
-                          <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{item.wastagePct}%</td>
-                          <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{gross.toFixed(3)}g</td>
-                          <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{Number(item.rate).toLocaleString('en-IN')}</td>
-                          <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{Number(item.makingCharges).toLocaleString('en-IN')}</td>
-                          <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{Number(item.amount).toLocaleString('en-IN')}</td>
+                           <td style={{ border: '1px solid #b45309', padding: 6 }}>{item.description}</td>
+                           <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'center' }}>{item.hsnCode}</td>
+                           <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{Number(item.netWeight).toFixed(3)}g</td>
+                           <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{item.wastagePct}%</td>
+                           <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{Number(item.stoneWeight || 0).toFixed(3)}g</td>
+                           <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{gross.toFixed(3)}g</td>
+                           <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{Number(item.rate).toLocaleString('en-IN')}</td>
+                           <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{Number(item.makingCharges).toLocaleString('en-IN')}</td>
+                           <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{Number(item.amount).toLocaleString('en-IN')}</td>
                         </tr>
                       );
                     })}
                     {Number(invoiceData.otherCharges) > 0 && (
                       <tr>
                         <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'center' }}>{invoiceData.items.length + 1}</td>
-                        <td style={{ border: '1px solid #b45309', padding: 6 }} colSpan="7">Other Charges / Additions</td>
+                        <td style={{ border: '1px solid #b45309', padding: 6 }} colSpan="8">Other Charges / Additions</td>
                         <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{Number(invoiceData.otherCharges).toLocaleString('en-IN')}</td>
                       </tr>
                     )}
@@ -1050,7 +1074,10 @@ const Invoice = () => {
                       </td>
                       <td style={{ border: '1px solid #b45309' }}></td>
                       <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>
-                        {invoiceData.items.reduce((sum, i) => sum + (Number(i.netWeight) * (1 + (Number(i.wastagePct) || 0) / 100)), 0).toFixed(3)}g
+                        {invoiceData.items.reduce((sum, i) => sum + (Number(i.stoneWeight) || 0), 0).toFixed(3)}g
+                      </td>
+                      <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>
+                        {invoiceData.items.reduce((sum, i) => sum + Math.max(0, Number(i.netWeight) * (1 + (Number(i.wastagePct) || 0) / 100) - (Number(i.stoneWeight) || 0)), 0).toFixed(3)}g
                       </td>
                       <td colSpan="2" style={{ border: '1px solid #b45309' }}></td>
                       <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{subTotal.toLocaleString('en-IN')}</td>

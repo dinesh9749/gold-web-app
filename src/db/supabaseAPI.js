@@ -626,6 +626,7 @@ export const supabaseAPI = {
         hsn_code: item.hsnCode,
         net_weight: item.netWeight,
         wastage_pct: item.wastagePct || 0,
+        stone_weight: item.stoneWeight || 0,
         making_charges: item.makingCharges || 0,
         rate_per_gram: item.ratePerGram,
         amount: item.amount
@@ -700,6 +701,7 @@ export const supabaseAPI = {
         hsnCode: item.hsn_code,
         netWeight: item.net_weight,
         wastagePct: item.wastage_pct,
+        stoneWeight: item.stone_weight || 0,
         makingCharges: item.making_charges,
         ratePerGram: item.rate_per_gram,
         amount: item.amount
