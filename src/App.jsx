@@ -15,30 +15,34 @@ import Receipt from './pages/Receipt';
 import Attendance from './pages/Attendance';
 import EmployeeSetup from './pages/EmployeeSetup';
 import PosterCreate from './pages/PosterCreate';
+import { Analytics } from "@vercel/analytics/react"
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="Invoice" element={<Invoice />} />
-          <Route path="Receipt" element={<Receipt />} />
-          <Route path="rateinput" element={<Rateinput />} />
-          <Route path="customerview" element={<CustomerView />} />
-          <Route path="SalesOrders" element={<SalesOrders />} />
-          <Route path="MsDigiGold" element={<MsDigiGold />} />
-          <Route path="MsSolderingEngraving" element={<MsSolderingEngraving />} />
-          <Route path="attendance" element={<Attendance />} />
-          <Route path="employee-setup" element={<EmployeeSetup />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="poster-create" element={<PosterCreate />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Route>
-      </Routes>
-    </Router>
+    <>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="Invoice" element={<Invoice />} />
+            <Route path="Receipt" element={<Receipt />} />
+            <Route path="rateinput" element={<Rateinput />} />
+            <Route path="customerview" element={<CustomerView />} />
+            <Route path="SalesOrders" element={<SalesOrders />} />
+            <Route path="MsDigiGold" element={<MsDigiGold />} />
+            <Route path="MsSolderingEngraving" element={<MsSolderingEngraving />} />
+            <Route path="attendance" element={<Attendance />} />
+            <Route path="employee-setup" element={<EmployeeSetup />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="poster-create" element={<PosterCreate />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Route>
+        </Routes>
+      </Router>
+      <Analytics />
+    </>
   );
 }
 
-export default App;
+export default App;
