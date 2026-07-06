@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, Outlet, useLocation, Navigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, Navigate, useNavigate } from 'react-router-dom';
 
 // Icons as inline SVGs for clean, lightweight rendering
 const icons = {
@@ -115,14 +115,48 @@ const pageTitles = {
 
 function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname.split('/')[1]?.toLowerCase();
   const pageTitle = pageTitles[currentPath] || 'Dashboard';
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  const org = JSON.parse(localStorage.getItem("goldApp_org") || "null");
+  const userRole = localStorage.getItem("goldApp_userRole");
   const isAdmin = true;
-  const mainMenu = navItems.slice(0, 4);
-  const managementMenu = navItems.slice(4);
+
+  const displayName = userRole === "superadmin" ? "Super Admin" : (org?.name || "Original Store");
+  const displayRole = userRole === "superadmin" ? "Master Account" : "Store Partner";
+  const avatarLetter = displayName.charAt(0).toUpperCase();
+
+  const isFeatureEnabled = (to) => {
+    if (userRole === "superadmin") return true;
+    if (!org) return false;
+    if (!org.features) return true;
+    const key = to.replace("/", "").toLowerCase();
+    const featureMap = {
+      dashboard: 'dashboard_enabled',
+      invoice: 'invoice_enabled',
+      receipt: 'receipt_enabled',
+      rateinput: 'rateinput_enabled',
+      customerview: 'customerview_enabled',
+      salesorders: 'salesorders_enabled',
+      msdigigold: 'digigold_enabled',
+      mssolderingengraving: 'soldering_enabled',
+      attendance: 'attendance_enabled',
+      'employee-setup': 'empsetup_enabled',
+      'poster-create': 'poster_enabled',
+      settings: 'settings_enabled',
+    };
+    const featureKey = featureMap[key];
+    if (!featureKey) return true;
+    return !!org.features[featureKey];
+  };
+
+  const allowedNavItems = navItems.filter(item => isFeatureEnabled(item.to));
+
+  const mainMenu = allowedNavItems.filter(item => ['/dashboard', '/Invoice', '/Receipt', '/Rateinput'].includes(item.to));
+  const managementMenu = allowedNavItems.filter(item => !['/dashboard', '/Invoice', '/Receipt', '/Rateinput'].includes(item.to));
 
   return (
     <div className={`app-layout ${isMobileSidebarOpen ? 'sidebar-open' : ''}`}>
@@ -186,6 +220,7 @@ function Layout() {
             borderRadius: 8,
             background: 'rgba(251,191,36,0.06)',
             border: '1px solid var(--border-subtle)',
+            width: '100%'
           }}>
             <div style={{
               width: 28,
@@ -199,11 +234,32 @@ function Layout() {
               fontWeight: 700,
               color: '#ffffff',
               flexShrink: 0,
-            }}>{isAdmin ? "A" : "S"}</div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{isAdmin ? "Dheena" : "Staff User"}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{isAdmin ? "Administrator" : "Staff Account"}</div>
+            }}>{avatarLetter}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
+              <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{displayRole}</div>
             </div>
+            <button 
+              onClick={() => {
+                localStorage.clear();
+                navigate('/login', { replace: true });
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#f87171',
+                cursor: 'pointer',
+                padding: '4px 6px',
+                fontSize: 14,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 4
+              }}
+              title="Logout"
+            >
+              🚪
+            </button>
           </div>
         </div>
       </aside>
@@ -226,9 +282,9 @@ function Layout() {
             {pageTitle}
           </div>
           <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span className="topbar-badge">✦ M.S. Gold</span>
-            <div className="topbar-avatar" title="Administrator Mode">
-              A
+            <span className="topbar-badge">✦ {displayName}</span>
+            <div className="topbar-avatar" title={displayRole}>
+              {avatarLetter}
             </div>
           </div>
         </header>

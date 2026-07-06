@@ -7,7 +7,92 @@ const ensureRowReturned = (data, tableName) => {
   return data[0];
 };
 
+const getActiveOrgId = () => {
+  const role = localStorage.getItem("goldApp_userRole");
+  if (role === "superadmin") {
+    return '00000000-0000-0000-0000-000000000000';
+  }
+  const org = JSON.parse(localStorage.getItem("goldApp_org") || "null");
+  return org?.id || '00000000-0000-0000-0000-000000000000';
+};
+
 export const supabaseAPI = {
+  // --- ORGANIZATIONS (SUPER ADMIN ONLY) ---
+  getAllOrganizations: async () => {
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data.map(row => ({
+      id: row.id,
+      name: row.name,
+      loginSlug: row.login_slug,
+      password: row.password,
+      isActive: row.is_active,
+      features: row.features,
+      createdAt: row.created_at
+    }));
+  },
+
+  saveOrganization: async (orgData) => {
+    const { data, error } = await supabase
+      .from('organizations')
+      .insert([{
+        name: orgData.name,
+        login_slug: orgData.loginSlug,
+        password: orgData.password,
+        is_active: orgData.isActive !== false,
+        features: orgData.features
+      }])
+      .select();
+    if (error) throw error;
+    const row = ensureRowReturned(data, 'organizations');
+    return { id: row.id };
+  },
+
+  updateOrganization: async (id, orgData) => {
+    const { error } = await supabase
+      .from('organizations')
+      .update({
+        name: orgData.name,
+        login_slug: orgData.loginSlug,
+        password: orgData.password,
+        is_active: orgData.isActive !== false,
+        features: orgData.features
+      })
+      .eq('id', id);
+    if (error) throw error;
+    return { success: true };
+  },
+
+  deleteOrganization: async (id) => {
+    const { error } = await supabase
+      .from('organizations')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+    return { success: true };
+  },
+
+  loginOrganization: async (loginSlug, password) => {
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('login_slug', loginSlug.trim().toLowerCase())
+      .eq('password', password)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return {
+      id: data.id,
+      name: data.name,
+      loginSlug: data.login_slug,
+      isActive: data.is_active,
+      features: data.features
+    };
+  },
+
   // --- METAL RATES ---
   saveMetalRates: async (rateData) => {
     try {
@@ -16,7 +101,8 @@ export const supabaseAPI = {
         .insert([{
           gold_rate: rateData.goldRate,
           silver_rate: rateData.silverRate,
-          gold_24_rate: rateData.gold24Rate
+          gold_24_rate: rateData.gold24Rate,
+          org_id: getActiveOrgId()
         }])
         .select();
       if (error) throw error;
@@ -33,6 +119,7 @@ export const supabaseAPI = {
       const { data, error } = await supabase
         .from('metal_rates')
         .select('*')
+        .eq('org_id', getActiveOrgId())
         .order('created_at', { ascending: false })
         .limit(1);
       if (error) throw error;
@@ -45,6 +132,7 @@ export const supabaseAPI = {
 
   // --- SALES ORDERS ---
   saveSalesOrder: async (orderData) => {
+    const orgId = getActiveOrgId();
     const { data: order, error: orderErr } = await supabase
       .from('sales_orders')
       .insert([{
@@ -53,7 +141,8 @@ export const supabaseAPI = {
         advance_gold: orderData.advanceGold || 0,
         delivery_date: orderData.deliveryDate,
         status: orderData.status || 'incomplete',
-        notes: orderData.notes || null
+        notes: orderData.notes || null,
+        org_id: orgId
       }])
       .select();
     if (orderErr) throw orderErr;
@@ -79,6 +168,7 @@ export const supabaseAPI = {
     const { data, error } = await supabase
       .from('sales_orders')
       .select('*, order_products(*)')
+      .eq('org_id', getActiveOrgId())
       .order('created_at', { ascending: false });
     if (error) throw error;
 
@@ -104,7 +194,8 @@ export const supabaseAPI = {
     const { error } = await supabase
       .from('sales_orders')
       .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', orderId);
+      .eq('id', orderId)
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
   },
@@ -114,6 +205,7 @@ export const supabaseAPI = {
       .from('sales_orders')
       .select('*, order_products(*)')
       .eq('id', orderId)
+      .eq('org_id', getActiveOrgId())
       .single();
     if (error) throw error;
     if (!data) return null;
@@ -140,7 +232,8 @@ export const supabaseAPI = {
     const { error } = await supabase
       .from('sales_orders')
       .delete()
-      .eq('id', orderId);
+      .eq('id', orderId)
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
   },
@@ -158,7 +251,8 @@ export const supabaseAPI = {
         address1: customerData.address1,
         address2: customerData.address2 || '',
         address3: customerData.address3 || '',
-        state: customerData.state
+        state: customerData.state,
+        org_id: getActiveOrgId()
       }])
       .select();
     if (error) throw error;
@@ -170,6 +264,7 @@ export const supabaseAPI = {
     const { data, error } = await supabase
       .from('customers')
       .select('*')
+      .eq('org_id', getActiveOrgId())
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data.map(row => ({
@@ -193,6 +288,7 @@ export const supabaseAPI = {
       .from('customers')
       .select('*')
       .eq('id', customerId)
+      .eq('org_id', getActiveOrgId())
       .single();
     if (error) throw error;
     return {
@@ -226,7 +322,8 @@ export const supabaseAPI = {
         state: customerData.state,
         updated_at: new Date().toISOString()
       })
-      .eq('id', customerId);
+      .eq('id', customerId)
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
   },
@@ -235,7 +332,8 @@ export const supabaseAPI = {
     const { error } = await supabase
       .from('customers')
       .delete()
-      .eq('id', customerId);
+      .eq('id', customerId)
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
   },
@@ -244,6 +342,7 @@ export const supabaseAPI = {
     const { data, error } = await supabase
       .from('customers')
       .select('*')
+      .eq('org_id', getActiveOrgId())
       .or(`name.ilike.%${searchTerm}%,surname.ilike.%${searchTerm}%,mobile.ilike.%${searchTerm}%`)
       .order('created_at', { ascending: false });
     if (error) throw error;
@@ -275,7 +374,8 @@ export const supabaseAPI = {
         monthly_salary: data.monthlySalary || 0,
         ot_rate: data.otRate || 0,
         shift_start: data.shiftStart || '09:00',
-        shift_end: data.shiftEnd || '18:00'
+        shift_end: data.shiftEnd || '18:00',
+        org_id: getActiveOrgId()
       }])
       .select();
     if (error) throw error;
@@ -296,7 +396,8 @@ export const supabaseAPI = {
         shift_start: data.shiftStart || '09:00',
         shift_end: data.shiftEnd || '18:00'
       })
-      .eq('id', employeeId);
+      .eq('id', employeeId)
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
   },
@@ -305,6 +406,7 @@ export const supabaseAPI = {
     const { data, error } = await supabase
       .from('employees')
       .select('*')
+      .eq('org_id', getActiveOrgId())
       .eq('is_active', 1)
       .order('name', { ascending: true });
     if (error) throw error;
@@ -327,7 +429,8 @@ export const supabaseAPI = {
     const { error } = await supabase
       .from('employees')
       .delete()
-      .eq('id', employeeId);
+      .eq('id', employeeId)
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
   },
@@ -337,6 +440,7 @@ export const supabaseAPI = {
     const { data, error } = await supabase
       .from('roles')
       .select('*')
+      .eq('org_id', getActiveOrgId())
       .order('name', { ascending: true });
     if (error) throw error;
     return data.map(r => ({ id: r.id, name: r.name }));
@@ -345,7 +449,10 @@ export const supabaseAPI = {
   addRole: async (name) => {
     const { data, error } = await supabase
       .from('roles')
-      .insert([{ name: name.trim() }])
+      .insert([{
+        name: name.trim(),
+        org_id: getActiveOrgId()
+      }])
       .select();
     if (error) throw error;
     const row = ensureRowReturned(data, 'roles');
@@ -356,7 +463,8 @@ export const supabaseAPI = {
     const { error } = await supabase
       .from('roles')
       .delete()
-      .eq('id', roleId);
+      .eq('id', roleId)
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
   },
@@ -372,7 +480,8 @@ export const supabaseAPI = {
         check_in: data.checkIn || null,
         check_out: data.checkOut || null,
         ot_hours: data.otHours || 0,
-        notes: data.notes || null
+        notes: data.notes || null,
+        org_id: getActiveOrgId()
       }, { onConflict: 'employee_id,date' })
       .select();
     if (error) throw error;
@@ -384,16 +493,17 @@ export const supabaseAPI = {
     const { data, error } = await supabase
       .from('attendance')
       .select('*, employees(*)')
+      .eq('org_id', getActiveOrgId())
       .eq('date', date);
     if (error) throw error;
     return data.map(r => ({
       id: r.id,
       employeeId: r.employee_id,
-      employeeName: r.employees.name,
-      employeeRole: r.employees.role,
-      shiftStart: r.employees.shift_start,
-      shiftEnd: r.employees.shift_end,
-      otRate: r.employees.ot_rate,
+      employeeName: r.employees?.name || '',
+      employeeRole: r.employees?.role || '',
+      shiftStart: r.employees?.shift_start || '09:00',
+      shiftEnd: r.employees?.shift_end || '18:00',
+      otRate: r.employees?.ot_rate || 0,
       date: r.date,
       status: r.status,
       checkIn: r.check_in,
@@ -409,6 +519,7 @@ export const supabaseAPI = {
     const { data, error } = await supabase
       .from('attendance')
       .select('*')
+      .eq('org_id', getActiveOrgId())
       .eq('employee_id', employeeId)
       .like('date', `${prefix}%`)
       .order('date', { ascending: true });
@@ -427,10 +538,12 @@ export const supabaseAPI = {
   getMonthlySummary: async (month, year) => {
     const mm = String(month).padStart(2, '0');
     const prefix = `${year}-${mm}`;
+    const orgId = getActiveOrgId();
 
     const { data: employees, error: empErr } = await supabase
       .from('employees')
       .select('*')
+      .eq('org_id', orgId)
       .eq('is_active', 1)
       .order('name', { ascending: true });
     if (empErr) throw empErr;
@@ -438,6 +551,7 @@ export const supabaseAPI = {
     const { data: attendance, error: attErr } = await supabase
       .from('attendance')
       .select('*')
+      .eq('org_id', orgId)
       .like('date', `${prefix}%`);
     if (attErr) throw attErr;
 
@@ -488,7 +602,8 @@ export const supabaseAPI = {
         tenure_months: data.tenureMonths || 11,
         maturity_date: data.maturityDate || null,
         has_bonus: data.hasBonus !== undefined ? data.hasBonus : 1,
-        bonus_amount: data.bonusAmount || 0
+        bonus_amount: data.bonusAmount || 0,
+        org_id: getActiveOrgId()
       }])
       .select();
     if (error) throw error;
@@ -499,7 +614,8 @@ export const supabaseAPI = {
   getAllGoldSchemes: async () => {
     const { data, error } = await supabase
       .from('gold_schemes')
-      .select('*, customers(*), gold_collections(*)');
+      .select('*, customers(*), gold_collections(*)')
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
 
     return data.map(gs => {
@@ -535,7 +651,8 @@ export const supabaseAPI = {
     const { error } = await supabase
       .from('gold_schemes')
       .update({ status })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
   },
@@ -544,7 +661,8 @@ export const supabaseAPI = {
     const { error } = await supabase
       .from('gold_schemes')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
   },
@@ -557,7 +675,8 @@ export const supabaseAPI = {
         collection_date: data.collectionDate,
         collected_amount: data.collectedAmount,
         notes: data.notes || '',
-        is_bonus: data.isBonus || 0
+        is_bonus: data.isBonus || 0,
+        org_id: getActiveOrgId()
       }])
       .select();
     if (error) throw error;
@@ -566,7 +685,7 @@ export const supabaseAPI = {
   },
 
   getGoldCollections: async (schemeId) => {
-    let query = supabase.from('gold_collections').select('*');
+    let query = supabase.from('gold_collections').select('*').eq('org_id', getActiveOrgId());
     if (schemeId) {
       query = query.eq('scheme_id', schemeId);
     }
@@ -588,13 +707,15 @@ export const supabaseAPI = {
     const { error } = await supabase
       .from('gold_collections')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
   },
 
   // --- INVOICES ---
   saveInvoice: async (data) => {
+    const orgId = getActiveOrgId();
     const { data: invoice, error: invErr } = await supabase
       .from('invoices')
       .insert([{
@@ -612,7 +733,8 @@ export const supabaseAPI = {
         grand_total: data.grandTotal,
         final_amount: data.finalAmount,
         other_charges: data.otherCharges || 0,
-        product_photo: data.productPhoto || null
+        product_photo: data.productPhoto || null,
+        org_id: orgId
       }])
       .select();
     if (invErr) throw invErr;
@@ -629,7 +751,8 @@ export const supabaseAPI = {
         stone_weight: item.stoneWeight || 0,
         making_charges: item.makingCharges || 0,
         rate_per_gram: item.ratePerGram,
-        amount: item.amount
+        amount: item.amount,
+        org_id: orgId
       }));
       const { error: itemsErr } = await supabase
         .from('invoice_items')
@@ -643,6 +766,7 @@ export const supabaseAPI = {
     const { data, error } = await supabase
       .from('invoices')
       .select('*')
+      .eq('org_id', getActiveOrgId())
       .order('date', { ascending: false })
       .order('created_at', { ascending: false });
     if (error) throw error;
@@ -672,6 +796,7 @@ export const supabaseAPI = {
       .from('invoices')
       .select('*, invoice_items(*)')
       .eq('id', id)
+      .eq('org_id', getActiveOrgId())
       .single();
     if (invErr) throw invErr;
     if (!invoice) return null;
@@ -713,7 +838,8 @@ export const supabaseAPI = {
     const { error } = await supabase
       .from('invoices')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
   },
@@ -722,7 +848,8 @@ export const supabaseAPI = {
     const { error } = await supabase
       .from('invoices')
       .update({ product_photo: photoData })
-      .eq('id', id);
+      .eq('id', id)
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { success: true };
   },
@@ -737,7 +864,8 @@ export const supabaseAPI = {
         product: jobData.product,
         marking_charges: jobData.markingCharges,
         gst_amount: jobData.gstAmount,
-        total_amount: jobData.totalAmount
+        total_amount: jobData.totalAmount,
+        org_id: getActiveOrgId()
       }])
       .select();
     if (error) throw error;
@@ -749,6 +877,7 @@ export const supabaseAPI = {
     const { data, error } = await supabase
       .from('soldering_engraving_jobs')
       .select('*')
+      .eq('org_id', getActiveOrgId())
       .order('date', { ascending: false })
       .order('created_at', { ascending: false });
     if (error) throw error;
@@ -768,7 +897,8 @@ export const supabaseAPI = {
     const { error } = await supabase
       .from('soldering_engraving_jobs')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
   }
