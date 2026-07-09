@@ -1,6 +1,18 @@
 import { useState, useEffect } from "react";
 import { Printer, Save, Trash, Eye, RefreshCw, X } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
+const incrementInvoiceNo = (invNo) => {
+  if (!invNo) return 'INV-1001';
+  const match = invNo.match(/^(.*?)(\d+)$/);
+  if (!match) {
+    return invNo + "-1";
+  }
+  const prefix = match[1];
+  const numberStr = match[2];
+  const nextNumber = parseInt(numberStr, 10) + 1;
+  const paddedNumber = String(nextNumber).padStart(numberStr.length, '0');
+  return prefix + paddedNumber;
+};
 
 const Invoice = () => {
   const outletContext = useOutletContext();
@@ -61,7 +73,6 @@ const Invoice = () => {
 
   useEffect(() => {
     loadData();
-    generateInvoiceNumber();
   }, []);
 
   const loadData = async () => {
@@ -69,6 +80,14 @@ const Invoice = () => {
       // Load customers
       const custRes = await window.electronAPI?.getAllCustomers();
       if (custRes) setCustomers(custRes);
+
+      // Load next invoice number settings
+      const settingsRes = await window.electronAPI?.getOrganizationSettings();
+      if (settingsRes?.next_invoice_number) {
+        setInvoiceData(prev => ({ ...prev, invoiceNo: settingsRes.next_invoice_number }));
+      } else {
+        setInvoiceData(prev => ({ ...prev, invoiceNo: 'INV-1001' }));
+      }
 
       // Load live gold rates (22K)
       const ratesRes = await window.electronAPI?.getMetalRates();
@@ -95,12 +114,6 @@ const Invoice = () => {
     }
   };
 
-  const generateInvoiceNumber = () => {
-    const random = Math.floor(1000 + Math.random() * 9000);
-    const year = new Date().getFullYear();
-    setInvoiceData(prev => ({ ...prev, invoiceNo: `INV-${year}-${random}` }));
-  };
-
   const loadInvoicesHistory = async () => {
     try {
       setHistoryLoading(true);
@@ -110,6 +123,51 @@ const Invoice = () => {
       console.error("Error loading invoice history:", error);
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  const handleClosePreview = () => {
+    setShowPreview(false);
+    if (!invoiceData.id) {
+      setInvoiceData({
+        id: null,
+        invoiceNo: "",
+        date: new Date().toISOString().split("T")[0],
+        customerId: null,
+        consignee: "",
+        items: [
+          {
+            description: "",
+            hsnCode: "",
+            netWeight: "",
+            wastagePct: "",
+            stoneWeight: "",
+            rate: liveGoldRate || 0,
+            makingCharges: "",
+            amount: 0,
+          },
+        ],
+        cgstRate: 1.5,
+        sgstRate: 1.5,
+        oldGoldWeight: "",
+        oldGoldRate: "",
+        oldGoldAmount: 0,
+        otherCharges: "",
+        productPhoto: null
+      });
+      setCustSearch("");
+      loadData();
+    }
+  };
+
+  const handleReloadSequence = async () => {
+    try {
+      const settingsRes = await window.electronAPI?.getOrganizationSettings();
+      if (settingsRes?.next_invoice_number) {
+        setInvoiceData(prev => ({ ...prev, invoiceNo: settingsRes.next_invoice_number }));
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -406,6 +464,10 @@ const Invoice = () => {
 
       const res = await window.electronAPI?.saveInvoice(payload);
       if (res?.id) {
+        // Increment and update the next invoice number in settings
+        const nextNo = incrementInvoiceNo(invoiceData.invoiceNo);
+        await window.electronAPI?.updateOrganizationSettings(nextNo);
+
         alert("Invoice saved to database successfully!");
         setShowPreview(true);
       }
@@ -553,8 +615,8 @@ const Invoice = () => {
               <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)' }}>Tax Invoice Generator</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>GST TAX INVOICE — M.S. GOLD SMITH</div>
             </div>
-            <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: 12 }} onClick={generateInvoiceNumber}>
-              ⟲ Regenerate Bill No
+            <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: 12 }} onClick={handleReloadSequence}>
+              ⟲ Load Sequence No
             </button>
           </div>
 
@@ -995,7 +1057,7 @@ const Invoice = () => {
                 <button onClick={handlePrint} className="btn-primary" style={{ padding: '6px 14px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Printer size={14} /> Print Bill
                 </button>
-                <button onClick={() => setShowPreview(false)} className="modal-close">✕</button>
+                <button onClick={handleClosePreview} className="modal-close">✕</button>
               </div>
             </div>
 

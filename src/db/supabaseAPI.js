@@ -901,5 +901,28 @@ export const supabaseAPI = {
       .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
+  },
+
+  getOrganizationSettings: async () => {
+    const org = JSON.parse(localStorage.getItem("goldApp_org") || "null");
+    if (!org) return null;
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('next_invoice_number')
+      .eq('id', org.id)
+      .single();
+    if (error) throw error;
+    return { next_invoice_number: data?.next_invoice_number || 'INV-1001' };
+  },
+
+  updateOrganizationSettings: async (nextInvoiceNumber) => {
+    const org = JSON.parse(localStorage.getItem("goldApp_org") || "null");
+    if (!org) return false;
+    const { error } = await supabase
+      .from('organizations')
+      .update({ next_invoice_number: nextInvoiceNumber })
+      .eq('id', org.id);
+    if (error) throw error;
+    return true;
   }
 };

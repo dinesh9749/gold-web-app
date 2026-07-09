@@ -93,7 +93,7 @@ export default function Login() {
             boxShadow: '0 8px 16px rgba(217, 119, 6, 0.2)',
             marginBottom: 16
           }}>💎</div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#92400e', margin: 0 }}>M.S. Gold</h2>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#92400e', margin: 0 }}>DK Nova Technologies</h2>
           <p style={{ fontSize: 12, color: '#b45309', margin: '4px 0 0 0', fontWeight: 600 }}>Multi-Store Management Portal</p>
         </div>
 
