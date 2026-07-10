@@ -908,21 +908,156 @@ export const supabaseAPI = {
     if (!org) return null;
     const { data, error } = await supabase
       .from('organizations')
-      .select('next_invoice_number')
+      .select('next_invoice_number, next_receipt_number')
       .eq('id', org.id)
       .single();
     if (error) throw error;
-    return { next_invoice_number: data?.next_invoice_number || 'INV-1001' };
+    return {
+      next_invoice_number: data?.next_invoice_number || 'INV-1001',
+      next_receipt_number: data?.next_receipt_number || 'REC-1001'
+    };
   },
 
-  updateOrganizationSettings: async (nextInvoiceNumber) => {
+  updateOrganizationSettings: async (nextInvoiceNumber, nextReceiptNumber) => {
     const org = JSON.parse(localStorage.getItem("goldApp_org") || "null");
     if (!org) return false;
     const { error } = await supabase
       .from('organizations')
-      .update({ next_invoice_number: nextInvoiceNumber })
+      .update({
+        next_invoice_number: nextInvoiceNumber,
+        next_receipt_number: nextReceiptNumber
+      })
       .eq('id', org.id);
     if (error) throw error;
     return true;
+  },
+
+  // --- RECEIPTS ---
+  saveReceipt: async (data) => {
+    const orgId = getActiveOrgId();
+    const { data: receipt, error: recErr } = await supabase
+      .from('receipts')
+      .insert([{
+        receipt_no: data.receiptNo,
+        date: data.date,
+        customer_id: data.customerId || null,
+        customer_name: data.customerName,
+        subtotal: data.subtotal,
+        old_gold_weight: data.oldGoldWeight || 0,
+        old_gold_amount: data.oldGoldAmount || 0,
+        grand_total: data.grandTotal,
+        final_amount: data.finalAmount,
+        other_charges: data.otherCharges || 0,
+        product_photo: data.productPhoto || null,
+        org_id: orgId
+      }])
+      .select();
+    if (recErr) throw recErr;
+    const receiptRow = ensureRowReturned(receipt, 'receipts');
+    const receiptId = receiptRow.id;
+
+    if (data.items && data.items.length > 0) {
+      const itemsToInsert = data.items.map(item => ({
+        receipt_id: receiptId,
+        description: item.description,
+        hsn_code: item.hsnCode,
+        net_weight: item.netWeight,
+        wastage_pct: item.wastagePct || 0,
+        stone_weight: item.stoneWeight || 0,
+        making_charges: item.makingCharges || 0,
+        rate_per_gram: item.ratePerGram,
+        amount: item.amount,
+        org_id: orgId
+      }));
+      const { error: itemsErr } = await supabase
+        .from('receipt_items')
+        .insert(itemsToInsert);
+      if (itemsErr) throw itemsErr;
+    }
+    return { id: receiptId };
+  },
+
+  getAllReceipts: async () => {
+    const { data, error } = await supabase
+      .from('receipts')
+      .select('*')
+      .eq('org_id', getActiveOrgId())
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data.map(row => ({
+      id: row.id,
+      receiptNo: row.receipt_no,
+      date: row.date,
+      customerId: row.customer_id,
+      customerName: row.customer_name,
+      subtotal: row.subtotal,
+      oldGoldWeight: row.old_gold_weight,
+      oldGoldAmount: row.old_gold_amount,
+      grandTotal: row.grand_total,
+      finalAmount: row.final_amount,
+      otherCharges: parseFloat(row.other_charges) || 0,
+      productPhoto: row.product_photo || null,
+      createdAt: row.created_at
+    }));
+  },
+
+  getReceiptById: async (id) => {
+    const { data: receipt, error: recErr } = await supabase
+      .from('receipts')
+      .select('*, receipt_items(*)')
+      .eq('id', id)
+      .eq('org_id', getActiveOrgId())
+      .single();
+    if (recErr) throw recErr;
+    if (!receipt) return null;
+
+    return {
+      id: receipt.id,
+      receiptNo: receipt.receipt_no,
+      date: receipt.date,
+      customerId: receipt.customer_id,
+      customerName: receipt.customer_name,
+      subtotal: receipt.subtotal,
+      oldGoldWeight: receipt.old_gold_weight,
+      oldGoldAmount: receipt.old_gold_amount,
+      grandTotal: receipt.grand_total,
+      finalAmount: receipt.final_amount,
+      otherCharges: parseFloat(receipt.other_charges) || 0,
+      productPhoto: receipt.product_photo || null,
+      createdAt: receipt.created_at,
+      items: (receipt.receipt_items || []).map(item => ({
+        id: item.id,
+        receiptId: item.receipt_id,
+        description: item.description,
+        hsnCode: item.hsn_code,
+        netWeight: item.net_weight,
+        wastagePct: item.wastage_pct,
+        stoneWeight: item.stone_weight || 0,
+        makingCharges: item.making_charges,
+        ratePerGram: item.rate_per_gram,
+        amount: item.amount
+      }))
+    };
+  },
+
+  deleteReceipt: async (id) => {
+    const { error } = await supabase
+      .from('receipts')
+      .delete()
+      .eq('id', id)
+      .eq('org_id', getActiveOrgId());
+    if (error) throw error;
+    return { changes: 1 };
+  },
+
+  updateReceiptPhoto: async (id, photoData) => {
+    const { error } = await supabase
+      .from('receipts')
+      .update({ product_photo: photoData })
+      .eq('id', id)
+      .eq('org_id', getActiveOrgId());
+    if (error) throw error;
+    return { success: true };
   }
 };

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 
 export default function Settings() {
   const [nextInvoiceNo, setNextInvoiceNo] = useState('');
+  const [nextReceiptNo, setNextReceiptNo] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -15,10 +16,12 @@ export default function Settings() {
     try {
       setLoading(true);
       const res = await window.electronAPI?.getOrganizationSettings();
-      if (res?.next_invoice_number) {
-        setNextInvoiceNo(res.next_invoice_number);
+      if (res) {
+        setNextInvoiceNo(res.next_invoice_number || 'INV-1001');
+        setNextReceiptNo(res.next_receipt_number || 'REC-1001');
       } else {
         setNextInvoiceNo('INV-1001');
+        setNextReceiptNo('REC-1001');
       }
     } catch (err) {
       console.error(err);
@@ -30,17 +33,20 @@ export default function Settings() {
 
   const handleSaveSettings = async (e) => {
     e.preventDefault();
-    if (!nextInvoiceNo.trim()) {
-      setErrorMessage("Invoice number sequence cannot be blank.");
+    if (!nextInvoiceNo.trim() || !nextReceiptNo.trim()) {
+      setErrorMessage("Sequence numbers cannot be blank.");
       return;
     }
     setSaving(true);
     setErrorMessage('');
     setSuccessMessage('');
     try {
-      const ok = await window.electronAPI?.updateOrganizationSettings(nextInvoiceNo.trim());
+      const ok = await window.electronAPI?.updateOrganizationSettings(
+        nextInvoiceNo.trim(),
+        nextReceiptNo.trim()
+      );
       if (ok) {
-        setSuccessMessage("Invoice number sequence updated successfully!");
+        setSuccessMessage("Settings updated successfully!");
         setTimeout(() => setSuccessMessage(''), 3000);
       } else {
         setErrorMessage("Failed to save settings.");
@@ -95,10 +101,10 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Invoice Sequence Settings Card */}
+      {/* Invoice & Receipt Sequence Settings Card */}
       <div className="card" style={{ marginBottom: 20, maxWidth: 600 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 16 }}>
-          ⚙️ Invoice Number Configuration
+          ⚙️ Document Number Sequences
         </div>
 
         {loading ? (
@@ -106,27 +112,40 @@ export default function Settings() {
         ) : (
           <form onSubmit={handleSaveSettings}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label className="form-label">Next Invoice Number Sequence</label>
-                <input
-                  type="text"
-                  value={nextInvoiceNo}
-                  onChange={e => setNextInvoiceNo(e.target.value)}
-                  className="form-input"
-                  placeholder="e.g. INV-1001, 2026/0001"
-                  required
-                />
-                <span style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, display: 'block' }}>
-                  Provide the start sequence format. It will auto-increment (e.g., INV-1001 will count to INV-1002 upon invoice save).
-                </span>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label className="form-label">Next Invoice Number</label>
+                  <input
+                    type="text"
+                    value={nextInvoiceNo}
+                    onChange={e => setNextInvoiceNo(e.target.value)}
+                    className="form-input"
+                    placeholder="e.g. INV-1001"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Next Receipt Number</label>
+                  <input
+                    type="text"
+                    value={nextReceiptNo}
+                    onChange={e => setNextReceiptNo(e.target.value)}
+                    className="form-input"
+                    placeholder="e.g. REC-1001"
+                    required
+                  />
+                </div>
               </div>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                Provide the start sequence formats. They will auto-increment automatically (e.g. REC-1001 increments to REC-1002 on saving a receipt).
+              </span>
               <button
                 type="submit"
                 disabled={saving}
                 className="btn-primary"
                 style={{ width: 'fit-content', padding: '8px 16px', fontSize: 12 }}
               >
-                {saving ? 'Saving...' : 'Save Sequence'}
+                {saving ? 'Saving...' : 'Save Settings'}
               </button>
             </div>
           </form>

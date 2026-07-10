@@ -162,8 +162,8 @@ function Layout() {
     <div className={`app-layout ${isMobileSidebarOpen ? 'sidebar-open' : ''}`}>
       {/* Mobile Sidebar Backdrop Overlay */}
       {isMobileSidebarOpen && (
-        <div 
-          className="sidebar-backdrop" 
+        <div
+          className="sidebar-backdrop"
           onClick={() => setIsMobileSidebarOpen(false)}
         />
       )}
@@ -175,8 +175,8 @@ function Layout() {
           <div className="sidebar-logo-inner">
             <div className="sidebar-logo-icon">💎</div>
             <div className="sidebar-logo-text">
-              <span className="sidebar-logo-name">M.S. Gold</span>
-              <span className="sidebar-logo-sub">Jewellery ERP</span>
+              <span className="sidebar-logo-name" style={{ fontSize: displayName.length > 15 ? '13px' : '15px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '160px' }} title={displayName}>{displayName}</span>
+              <span className="sidebar-logo-sub">ERP SOFTWARE</span>
             </div>
           </div>
         </div>
@@ -239,7 +239,7 @@ function Layout() {
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName}</div>
               <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{displayRole}</div>
             </div>
-            <button 
+            <button
               onClick={() => {
                 localStorage.clear();
                 navigate('/login', { replace: true });

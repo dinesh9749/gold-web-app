@@ -142,6 +142,29 @@ export default function SuperAdmin() {
     }
   };
 
+  const handleToggleActiveClick = async (e, org) => {
+    e.stopPropagation();
+    const updatedPayload = {
+      name: org.name,
+      loginSlug: org.loginSlug,
+      password: org.password,
+      isActive: !org.isActive,
+      features: org.features
+    };
+    try {
+      setSaving(true);
+      await supabaseAPI.updateOrganization(org.id, updatedPayload);
+      setSuccessMsg(`Organization "${org.name}" has been ${!org.isActive ? 'activated' : 'deactivated'}.`);
+      await loadOrgs();
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("Failed to toggle organization status.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.clear();
     navigate("/login", { replace: true });
@@ -277,19 +300,32 @@ export default function SuperAdmin() {
                     </div>
                   </div>
                   
-                  {/* Delete Button */}
-                  {org.loginSlug !== 'msgold' && (
+                  {/* Deactivate/Activate & Delete Buttons */}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 12 }}>
+                    <button
+                      onClick={(e) => handleToggleActiveClick(e, org)}
+                      className={org.isActive ? "btn-secondary" : "btn-primary"}
+                      style={{
+                        padding: '6px 10px',
+                        fontSize: 11,
+                        borderColor: org.isActive ? '#ef4444' : '#22c55e',
+                        color: org.isActive ? '#ef4444' : '#ffffff',
+                        background: org.isActive ? 'none' : '#22c55e',
+                      }}
+                    >
+                      {org.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteClick(org.id, org.name);
                       }}
                       className="btn-danger"
-                      style={{ padding: '6px 10px', fontSize: 11, marginLeft: 12 }}
+                      style={{ padding: '6px 10px', fontSize: 11 }}
                     >
                       Delete
                     </button>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>
