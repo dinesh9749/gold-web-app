@@ -14,7 +14,8 @@ const INITIAL_FEATURES = {
   attendance_enabled: true,
   empsetup_enabled: true,
   poster_enabled: true,
-  settings_enabled: true
+  settings_enabled: true,
+  stock_enabled: true
 };
 
 const FEATURE_LABELS = {
@@ -29,7 +30,8 @@ const FEATURE_LABELS = {
   attendance_enabled: 'Attendance',
   empsetup_enabled: 'Employee Setup',
   poster_enabled: 'Poster Creator',
-  settings_enabled: 'Settings'
+  settings_enabled: 'Settings',
+  stock_enabled: 'Stock Inventory'
 };
 
 export default function SuperAdmin() {

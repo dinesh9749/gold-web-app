@@ -14,6 +14,7 @@ import Receipt from './pages/Receipt';
 import Attendance from './pages/Attendance';
 import EmployeeSetup from './pages/EmployeeSetup';
 import PosterCreate from './pages/PosterCreate';
+import Stock from './pages/Stock';
 import Login from './pages/Login';
 import SuperAdmin from './pages/SuperAdmin';
 import FeatureGuard from './components/FeatureGuard';
@@ -48,6 +49,7 @@ function App() {
             <Route path="MsSolderingEngraving" element={<FeatureGuard featureKey="soldering_enabled"><MsSolderingEngraving /></FeatureGuard>} />
             <Route path="attendance" element={<FeatureGuard featureKey="attendance_enabled"><Attendance /></FeatureGuard>} />
             <Route path="employee-setup" element={<FeatureGuard featureKey="empsetup_enabled"><EmployeeSetup /></FeatureGuard>} />
+            <Route path="Stock" element={<FeatureGuard featureKey="stock_enabled"><Stock /></FeatureGuard>} />
             <Route path="settings" element={<FeatureGuard featureKey="settings_enabled"><Settings /></FeatureGuard>} />
             <Route path="poster-create" element={<FeatureGuard featureKey="poster_enabled"><PosterCreate /></FeatureGuard>} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

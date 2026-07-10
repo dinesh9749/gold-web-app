@@ -1059,5 +1059,60 @@ export const supabaseAPI = {
       .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { success: true };
+  },
+
+  // --- STOCK MANAGEMENT ---
+  saveStockTransaction: async (data) => {
+    const orgId = getActiveOrgId();
+    const { data: trans, error } = await supabase
+      .from('stock_transactions')
+      .insert([{
+        transaction_type: data.transactionType,
+        item_name: data.itemName,
+        purity: data.purity,
+        weight: parseFloat(data.weight) || 0,
+        quantity: parseInt(data.quantity, 10) || 1,
+        transaction_date: data.transactionDate,
+        supplier_customer: data.supplierCustomer || null,
+        notes: data.notes || null,
+        parent_transaction_id: data.parentTransactionId || null,
+        org_id: orgId
+      }])
+      .select();
+    if (error) throw error;
+    return ensureRowReturned(trans, 'stock_transactions');
+  },
+
+  getAllStockTransactions: async () => {
+    const { data, error } = await supabase
+      .from('stock_transactions')
+      .select('*')
+      .eq('org_id', getActiveOrgId())
+      .order('transaction_date', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data.map(row => ({
+      id: row.id,
+      transactionType: row.transaction_type,
+      itemName: row.item_name,
+      purity: row.purity,
+      weight: parseFloat(row.weight) || 0,
+      quantity: parseInt(row.quantity, 10) || 1,
+      transactionDate: row.transaction_date,
+      supplierCustomer: row.supplier_customer || '',
+      notes: row.notes || '',
+      parentTransactionId: row.parent_transaction_id || null,
+      createdAt: row.created_at
+    }));
+  },
+
+  deleteStockTransaction: async (id) => {
+    const { error } = await supabase
+      .from('stock_transactions')
+      .delete()
+      .eq('id', id)
+      .eq('org_id', getActiveOrgId());
+    if (error) throw error;
+    return { changes: 1 };
   }
 };
