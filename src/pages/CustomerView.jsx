@@ -48,7 +48,7 @@ const CustomerViewPage = () => {
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
-    if (!formData.name || !formData.surname || !formData.mobile || !formData.city || !formData.state || !formData.address1) {
+    if (!formData.name || !formData.surname || !formData.mobile || !formData.city || !formData.state) {
       alert('Please fill all required fields');
       return;
     }
@@ -259,7 +259,7 @@ const CustomerViewPage = () => {
                   )}
                 </div>
 
-                <ModalField label="Address Line 1 *" name="address1" value={formData.address1} onChange={handleChange} placeholder="Street address" />
+                <ModalField label="Address Line 1" name="address1" value={formData.address1} onChange={handleChange} placeholder="Street address" />
                 <ModalField label="Address Line 2" name="address2" value={formData.address2} onChange={handleChange} placeholder="Apartment, suite, etc." />
                 <ModalField label="Address Line 3" name="address3" value={formData.address3} onChange={handleChange} placeholder="Additional info" />
 
