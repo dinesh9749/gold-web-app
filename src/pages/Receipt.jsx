@@ -45,6 +45,12 @@ const Receipt = () => {
     }
   }, [showPhotoManager]);
 
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentReceipt, setPaymentReceipt] = useState(null);
+  const [newPaymentAmount, setNewPaymentAmount] = useState("");
+  const [newPaymentDate, setNewPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [paymentSaving, setPaymentSaving] = useState(false);
+
   const [receiptData, setReceiptData] = useState({
     id: null,
     receiptNo: "",
@@ -54,7 +60,7 @@ const Receipt = () => {
     items: [
       {
         description: "",
-        hsnCode: "",
+        advGold: "",
         netWeight: "",
         wastagePct: "",
         stoneWeight: "",
@@ -67,6 +73,7 @@ const Receipt = () => {
     oldGoldRate: "",
     oldGoldAmount: 0,
     otherCharges: "",
+    amountReceived: "",
     productPhoto: null
   });
 
@@ -137,7 +144,7 @@ const Receipt = () => {
         items: [
           {
             description: "",
-            hsnCode: "",
+            advGold: "",
             netWeight: "",
             wastagePct: "",
             stoneWeight: "",
@@ -150,6 +157,7 @@ const Receipt = () => {
         oldGoldRate: "",
         oldGoldAmount: 0,
         otherCharges: "",
+        amountReceived: "",
         productPhoto: null
       });
       setCustSearch("");
@@ -175,14 +183,15 @@ const Receipt = () => {
     }
   };
 
-  const calculateItemAmount = (netWeight, wastagePct, rate, makingCharges, stoneWeight = 0) => {
+  const calculateItemAmount = (netWeight, wastagePct, rate, makingCharges, stoneWeight = 0, advGold = 0) => {
     const nw = Number(netWeight) || 0;
     const wp = Number(wastagePct) || 0;
     const r = Number(rate) || 0;
     const mc = Number(makingCharges) || 0;
     const sw = Number(stoneWeight) || 0;
+    const ag = Number(advGold) || 0;
 
-    const grossWeight = Math.max(0, nw * (1 + wp / 100) - sw);
+    const grossWeight = Math.max(0, nw * (1 + wp / 100) - sw - ag);
     const amt = (grossWeight * r) + mc;
     return Math.round(amt * 100) / 100;
   };
@@ -214,8 +223,9 @@ const Receipt = () => {
       const rt = newItems[index].rate;
       const mc = newItems[index].makingCharges;
       const sw = newItems[index].stoneWeight;
+      const ag = newItems[index].advGold;
       
-      newItems[index].amount = calculateItemAmount(nw, wp, rt, mc, sw);
+      newItems[index].amount = calculateItemAmount(nw, wp, rt, mc, sw, ag);
       
       return { ...prev, items: newItems };
     });
@@ -228,7 +238,7 @@ const Receipt = () => {
         ...prev.items,
         {
           description: "",
-          hsnCode: "",
+          advGold: "",
           netWeight: "",
           wastagePct: "",
           stoneWeight: "",
@@ -288,10 +298,12 @@ const Receipt = () => {
         grandTotal: grandTotal,
         finalAmount: finalAmount,
         otherCharges: parseFloat(receiptData.otherCharges) || 0,
+        amountReceived: parseFloat(receiptData.amountReceived) || 0,
         productPhoto: receiptData.productPhoto || null,
         items: receiptData.items.map(item => ({
           description: item.description,
-          hsnCode: item.hsnCode,
+          hsnCode: null,
+          advGold: parseFloat(item.advGold) || 0,
           netWeight: parseFloat(item.netWeight) || 0,
           wastagePct: parseFloat(item.wastagePct) || 0,
           stoneWeight: parseFloat(item.stoneWeight) || 0,
@@ -345,7 +357,7 @@ const Receipt = () => {
           items: res.items.map(item => ({
             id: item.id,
             description: item.description,
-            hsnCode: item.hsnCode,
+            advGold: item.advGold,
             netWeight: item.netWeight,
             wastagePct: item.wastagePct,
             stoneWeight: item.stoneWeight || 0,
@@ -357,6 +369,7 @@ const Receipt = () => {
           oldGoldRate: res.oldGoldAmount && res.oldGoldWeight ? Math.round((res.oldGoldAmount / res.oldGoldWeight) * 100) / 100 : "",
           oldGoldAmount: res.oldGoldAmount || 0,
           otherCharges: res.otherCharges || "",
+          amountReceived: res.amountReceived || "",
           productPhoto: res.productPhoto || null
         });
         setShowPreview(true);
@@ -368,7 +381,71 @@ const Receipt = () => {
   };
 
   const handlePrint = () => {
+    const printContent = document.getElementById("invoice-preview");
+    if (!printContent) return;
+    const originalContents = document.body.innerHTML;
+    document.body.innerHTML = printContent.outerHTML;
     window.print();
+    document.body.innerHTML = originalContents;
+    window.location.reload();
+  };
+
+  const handleOpenPaymentModal = async (receipt) => {
+    try {
+      const fullRes = await window.electronAPI?.getReceiptById(receipt.id);
+      if (fullRes) {
+        setPaymentReceipt(fullRes);
+        setNewPaymentAmount("");
+        setNewPaymentDate(new Date().toISOString().split("T")[0]);
+        setShowPaymentModal(true);
+      }
+    } catch (err) {
+      console.error("Failed to load receipt payments list:", err);
+      alert("Failed to load receipt details.");
+    }
+  };
+
+  const handleSavePayment = async (e) => {
+    e.preventDefault();
+    const amt = parseFloat(newPaymentAmount);
+    if (isNaN(amt) || amt <= 0) {
+      alert("Please enter a valid positive payment amount.");
+      return;
+    }
+    setPaymentSaving(true);
+    try {
+      const res = await window.electronAPI?.saveReceiptPayment(paymentReceipt.id, amt, newPaymentDate);
+      if (res) {
+        alert("Payment recorded successfully!");
+        const updated = await window.electronAPI?.getReceiptById(paymentReceipt.id);
+        if (updated) {
+          setPaymentReceipt(updated);
+        }
+        loadReceiptsHistory();
+        setNewPaymentAmount("");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save payment transaction.");
+    } finally {
+      setPaymentSaving(false);
+    }
+  };
+
+  const handleDeletePayment = async (paymentId) => {
+    if (!window.confirm("Are you sure you want to delete this payment record?")) return;
+    try {
+      await window.electronAPI?.deleteReceiptPayment(paymentId);
+      alert("Payment transaction deleted successfully.");
+      const updated = await window.electronAPI?.getReceiptById(paymentReceipt.id);
+      if (updated) {
+        setPaymentReceipt(updated);
+      }
+      loadReceiptsHistory();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete payment transaction.");
+    }
   };
 
   // Autocomplete Filter
@@ -500,7 +577,7 @@ const Receipt = () => {
                   <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-default)', color: 'var(--text-muted)' }}>
                     <th style={{ padding: 8, width: 30 }}>#</th>
                     <th style={{ padding: 8, minWidth: 160 }}>Ornaments Description</th>
-                    <th style={{ padding: 8, width: 70 }}>HSN</th>
+                    <th style={{ padding: 8, width: 80 }}>Adv Gold (g)</th>
                     <th style={{ padding: 8, width: 80 }}>Net Wt (g)</th>
                     <th style={{ padding: 8, width: 80 }}>Wastage %</th>
                     <th style={{ padding: 8, width: 80 }}>Stone Wt (g)</th>
@@ -516,7 +593,8 @@ const Receipt = () => {
                     const nw = parseFloat(item.netWeight) || 0;
                     const wp = parseFloat(item.wastagePct) || 0;
                     const sw = parseFloat(item.stoneWeight) || 0;
-                    const grossWt = Math.max(0, nw * (1 + wp / 100) - sw).toFixed(3);
+                    const ag = parseFloat(item.advGold) || 0;
+                    const grossWt = Math.max(0, nw * (1 + wp / 100) - sw - ag).toFixed(3);
 
                     return (
                       <tr key={index} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
@@ -527,9 +605,9 @@ const Receipt = () => {
                             className="form-input" style={{ padding: 4, fontSize: 11 }} placeholder="e.g. Ring 22K" required />
                         </td>
                         <td style={{ padding: 6 }}>
-                          <input type="text" value={item.hsnCode}
-                            onChange={(e) => handleItemChange(index, "hsnCode", e.target.value)}
-                            className="form-input" style={{ padding: 4, fontSize: 11 }} placeholder="7113" />
+                          <input type="number" step="any" value={item.advGold}
+                            onChange={(e) => handleItemChange(index, "advGold", e.target.value)}
+                            className="form-input" style={{ padding: 4, fontSize: 11 }} placeholder="0" />
                         </td>
                         <td style={{ padding: 6 }}>
                           <input type="number" step="any" value={item.netWeight}
@@ -633,6 +711,25 @@ const Receipt = () => {
                   <span>Grand Total</span>
                   <span>₹{finalAmount.toLocaleString('en-IN')}</span>
                 </div>
+                {/* Amount Received */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Amount Received (₹)</span>
+                  <input type="number" name="amountReceived" value={receiptData.amountReceived}
+                    onChange={handleInputChange} className="form-input" style={{ width: 100, padding: 4, textAlign: 'right', fontSize: 11 }} placeholder="0" />
+                </div>
+                {/* Balance Pending */}
+                {(() => {
+                  const recd = parseFloat(receiptData.amountReceived) || 0;
+                  const bal = Math.max(0, finalAmount - recd);
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-subtle)', paddingTop: 8, fontSize: 12 }}>
+                      <span style={{ color: 'var(--text-muted)' }}>Balance Pending</span>
+                      <span style={{ fontWeight: 800, color: bal > 0 ? '#f87171' : 'var(--text-primary)' }}>
+                        ₹{bal.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Action Buttons */}
@@ -686,7 +783,9 @@ const Receipt = () => {
                     <th style={{ padding: 12 }}>Receipt No</th>
                     <th style={{ padding: 12 }}>Customer Details</th>
                     <th style={{ padding: 12, textAlign: 'right' }}>Total Wt</th>
-                    <th style={{ padding: 12, textAlign: 'right' }}>Amount</th>
+                    <th style={{ padding: 12, textAlign: 'right' }}>Bill Total</th>
+                    <th style={{ padding: 12, textAlign: 'right' }}>Recd Amount</th>
+                    <th style={{ padding: 12, textAlign: 'right' }}>Balance</th>
                     <th style={{ padding: 12, textAlign: 'center', width: 220 }}>Actions</th>
                   </tr>
                 </thead>
@@ -699,7 +798,22 @@ const Receipt = () => {
                         <td style={{ padding: 12, fontWeight: 700, color: 'var(--gold-200)' }}>{r.receiptNo}</td>
                         <td style={{ padding: 12, maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.customerName}</td>
                         <td style={{ padding: 12, textAlign: 'right' }}>{r.oldGoldWeight ? `${r.oldGoldWeight.toFixed(3)}g` : '-'}</td>
-                        <td style={{ padding: 12, textAlign: 'right', fontWeight: 700 }}>₹{r.finalAmount.toLocaleString('en-IN')}</td>
+                        <td style={{ padding: 12, textAlign: 'right', fontWeight: 700 }}>₹{(r.finalAmount || 0).toLocaleString('en-IN')}</td>
+                        <td style={{ padding: 12, textAlign: 'right' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+                            <span>₹{(r.amountReceived || 0).toLocaleString('en-IN')}</span>
+                            <button
+                              onClick={() => handleOpenPaymentModal(r)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, fontSize: 11 }}
+                              title="Update Payment Received"
+                            >
+                              ✏️
+                            </button>
+                          </div>
+                        </td>
+                        <td style={{ padding: 12, textAlign: 'right', fontWeight: 800, color: Math.max(0, (r.finalAmount || 0) - (r.amountReceived || 0)) > 0 ? '#ef4444' : 'var(--text-primary)' }}>
+                          ₹{Math.max(0, (r.finalAmount || 0) - (r.amountReceived || 0)).toLocaleString('en-IN')}
+                        </td>
                         <td style={{ padding: 8, textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                             <button
@@ -782,6 +896,7 @@ const Receipt = () => {
                     <tr style={{ borderBottom: '2px solid #000', fontWeight: 700 }}>
                       <th style={{ padding: '6px 4px', width: 30 }}>#</th>
                       <th style={{ padding: '6px 4px' }}>Description of Ornaments</th>
+                      <th style={{ padding: '6px 4px', textAlign: 'right', width: 70 }}>Adv Gold</th>
                       <th style={{ padding: '6px 4px', textAlign: 'right', width: 70 }}>Net Wt</th>
                       <th style={{ padding: '6px 4px', textAlign: 'right', width: 70 }}>Wastage</th>
                       <th style={{ padding: '6px 4px', textAlign: 'right', width: 70 }}>Stone Wt</th>
@@ -796,12 +911,14 @@ const Receipt = () => {
                       const nw = parseFloat(item.netWeight) || 0;
                       const wp = parseFloat(item.wastagePct) || 0;
                       const sw = parseFloat(item.stoneWeight) || 0;
-                      const grossWt = Math.max(0, nw * (1 + wp / 100) - sw).toFixed(3);
+                      const ag = parseFloat(item.advGold) || 0;
+                      const grossWt = Math.max(0, nw * (1 + wp / 100) - sw - ag).toFixed(3);
 
                       return (
                         <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
                           <td style={{ padding: '6px 4px' }}>{index + 1}</td>
                           <td style={{ padding: '6px 4px', textTransform: 'uppercase' }}>{item.description}</td>
+                          <td style={{ padding: '6px 4px', textAlign: 'right' }}>{ag ? `${ag.toFixed(3)}g` : '-'}</td>
                           <td style={{ padding: '6px 4px', textAlign: 'right' }}>{nw.toFixed(3)}g</td>
                           <td style={{ padding: '6px 4px', textAlign: 'right' }}>{wp ? `${wp}%` : '0%'}</td>
                           <td style={{ padding: '6px 4px', textAlign: 'right' }}>{sw ? `${sw.toFixed(3)}g` : '-'}</td>
@@ -849,6 +966,34 @@ const Receipt = () => {
                       <span>FINAL AMOUNT:</span>
                       <span>₹{finalAmount.toLocaleString('en-IN')}.00</span>
                     </div>
+                    {(() => {
+                      const recd = parseFloat(receiptData.amountReceived) || 0;
+                      const bal = Math.max(0, finalAmount - recd);
+                      return (
+                        <>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dotted #ccc', paddingTop: 4, fontSize: 11 }}>
+                            <span>Amount Received:</span>
+                            <strong>₹{recd.toLocaleString('en-IN')}.00</strong>
+                          </div>
+                          {receiptData.payments && receiptData.payments.length > 0 && (
+                            <div style={{ paddingLeft: 8, fontSize: 10, color: '#475569', borderLeft: '1px solid #ddd', margin: '4px 0' }}>
+                              {receiptData.payments.map((p, idx) => (
+                                <div key={p.id || idx} style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+                                  <span>• {new Date(p.paymentDate).toLocaleDateString('en-GB')}</span>
+                                  <span>₹{p.amount.toLocaleString('en-IN')}.00</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dotted #ccc', paddingTop: 4, fontSize: 11 }}>
+                            <span>Balance Pending:</span>
+                            <strong style={{ color: bal > 0 ? '#b91c1c' : '#0f172a' }}>
+                              ₹{bal.toLocaleString('en-IN')}.00
+                            </strong>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -956,6 +1101,107 @@ const Receipt = () => {
                 >
                   {photoManagerReceipt.productPhoto ? "Change Photo" : "Upload Photo"}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PAYMENT MANAGER MODAL */}
+      {showPaymentModal && paymentReceipt && (
+        <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="modal-box" style={{ maxWidth: 500, margin: 'auto' }}>
+            <div className="modal-header">
+              <div className="modal-title">💵 Collect Payment - Receipt {paymentReceipt.receiptNo}</div>
+              <button onClick={() => setShowPaymentModal(false)} className="modal-close">✕</button>
+            </div>
+            <div className="modal-body" style={{ padding: 20 }}>
+              {/* Payment Summary */}
+              <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', padding: 14, borderRadius: 8, marginBottom: 18, fontSize: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span>Bill Total Amount:</span>
+                  <strong>₹{paymentReceipt.finalAmount.toLocaleString('en-IN')}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <span>Total Amount Received:</span>
+                  <strong style={{ color: '#22c55e' }}>₹{(paymentReceipt.amountReceived || 0).toLocaleString('en-IN')}</strong>
+                </div>
+                {(() => {
+                  const bal = Math.max(0, paymentReceipt.finalAmount - (paymentReceipt.amountReceived || 0));
+                  return (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-subtle)', paddingTop: 6, marginTop: 6, fontWeight: 700 }}>
+                      <span>Balance Pending:</span>
+                      <span style={{ color: bal > 0 ? '#ef4444' : 'var(--text-primary)' }}>₹{bal.toLocaleString('en-IN')}</span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Add Payment Form */}
+              <form onSubmit={handleSavePayment} style={{ marginBottom: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <label className="form-label" style={{ fontSize: 11 }}>Payment Date</label>
+                    <input
+                      type="date"
+                      value={newPaymentDate}
+                      onChange={e => setNewPaymentDate(e.target.value)}
+                      className="form-input"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label" style={{ fontSize: 11 }}>Amount to Collect (₹)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="0"
+                      value={newPaymentAmount}
+                      onChange={e => setNewPaymentAmount(e.target.value)}
+                      className="form-input"
+                      required
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={paymentSaving}
+                  className="btn-primary"
+                  style={{ width: '100%', padding: '8px 12px', background: '#22c55e', borderColor: '#22c55e', color: '#fff', fontSize: 12 }}
+                >
+                  {paymentSaving ? "Saving..." : "Add Payment Record"}
+                </button>
+              </form>
+
+              <hr style={{ border: 'none', borderTop: '1px solid var(--border-subtle)', margin: '16px 0' }} />
+
+              {/* Payment History Log */}
+              <div style={{ fontSize: 12 }}>
+                <div style={{ fontWeight: 700, marginBottom: 8, color: 'var(--text-secondary)' }}>Recent Received Payments History</div>
+                {!paymentReceipt.payments || paymentReceipt.payments.length === 0 ? (
+                  <div style={{ padding: '10px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: 11 }}>
+                    No payment history logged yet.
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 6, background: 'var(--bg-elevated)' }}>
+                    {paymentReceipt.payments.map((p) => (
+                      <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontWeight: 700 }}>₹{p.amount.toLocaleString('en-IN')}</span>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>Date: {new Date(p.paymentDate).toLocaleDateString('en-GB')}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePayment(p.id)}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 11 }}
+                          title="Delete Payment"
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

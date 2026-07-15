@@ -948,6 +948,7 @@ export const supabaseAPI = {
         grand_total: data.grandTotal,
         final_amount: data.finalAmount,
         other_charges: data.otherCharges || 0,
+        amount_received: data.amountReceived || 0,
         product_photo: data.productPhoto || null,
         org_id: orgId
       }])
@@ -964,6 +965,7 @@ export const supabaseAPI = {
         net_weight: item.netWeight,
         wastage_pct: item.wastagePct || 0,
         stone_weight: item.stoneWeight || 0,
+        adv_gold: parseFloat(item.advGold) || 0,
         making_charges: item.makingCharges || 0,
         rate_per_gram: item.ratePerGram,
         amount: item.amount,
@@ -974,38 +976,62 @@ export const supabaseAPI = {
         .insert(itemsToInsert);
       if (itemsErr) throw itemsErr;
     }
+
+    if (data.amountReceived > 0) {
+      const { error: payErr } = await supabase
+        .from('receipt_payments')
+        .insert([{
+          receipt_id: receiptId,
+          amount: data.amountReceived,
+          payment_date: data.date,
+          org_id: orgId
+        }]);
+      if (payErr) throw payErr;
+    }
+
     return { id: receiptId };
   },
 
   getAllReceipts: async () => {
     const { data, error } = await supabase
       .from('receipts')
-      .select('*')
+      .select('*, receipt_payments(*)')
       .eq('org_id', getActiveOrgId())
       .order('date', { ascending: false })
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return data.map(row => ({
-      id: row.id,
-      receiptNo: row.receipt_no,
-      date: row.date,
-      customerId: row.customer_id,
-      customerName: row.customer_name,
-      subtotal: row.subtotal,
-      oldGoldWeight: row.old_gold_weight,
-      oldGoldAmount: row.old_gold_amount,
-      grandTotal: row.grand_total,
-      finalAmount: row.final_amount,
-      otherCharges: parseFloat(row.other_charges) || 0,
-      productPhoto: row.product_photo || null,
-      createdAt: row.created_at
-    }));
+    return data.map(row => {
+      const payments = row.receipt_payments || [];
+      const totalReceived = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+      return {
+        id: row.id,
+        receiptNo: row.receipt_no,
+        date: row.date,
+        customerId: row.customer_id,
+        customerName: row.customer_name,
+        subtotal: row.subtotal,
+        oldGoldWeight: row.old_gold_weight,
+        oldGoldAmount: row.old_gold_amount,
+        grandTotal: row.grand_total,
+        finalAmount: row.final_amount,
+        otherCharges: parseFloat(row.other_charges) || 0,
+        amountReceived: totalReceived,
+        payments: payments.map(p => ({
+          id: p.id,
+          amount: parseFloat(p.amount) || 0,
+          paymentDate: p.payment_date,
+          createdAt: p.created_at
+        })).sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)),
+        productPhoto: row.product_photo || null,
+        createdAt: row.created_at
+      };
+    });
   },
 
   getReceiptById: async (id) => {
     const { data: receipt, error: recErr } = await supabase
       .from('receipts')
-      .select('*, receipt_items(*)')
+      .select('*, receipt_items(*), receipt_payments(*)')
       .eq('id', id)
       .eq('org_id', getActiveOrgId())
       .single();
@@ -1024,6 +1050,13 @@ export const supabaseAPI = {
       grandTotal: receipt.grand_total,
       finalAmount: receipt.final_amount,
       otherCharges: parseFloat(receipt.other_charges) || 0,
+      amountReceived: (receipt.receipt_payments || []).reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0),
+      payments: (receipt.receipt_payments || []).map(p => ({
+        id: p.id,
+        amount: parseFloat(p.amount) || 0,
+        paymentDate: p.payment_date,
+        createdAt: p.created_at
+      })).sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate)),
       productPhoto: receipt.product_photo || null,
       createdAt: receipt.created_at,
       items: (receipt.receipt_items || []).map(item => ({
@@ -1034,6 +1067,7 @@ export const supabaseAPI = {
         netWeight: item.net_weight,
         wastagePct: item.wastage_pct,
         stoneWeight: item.stone_weight || 0,
+        advGold: item.adv_gold || 0,
         makingCharges: item.making_charges,
         ratePerGram: item.rate_per_gram,
         amount: item.amount
@@ -1049,6 +1083,31 @@ export const supabaseAPI = {
       .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
+  },
+
+  saveReceiptPayment: async (receiptId, amount, paymentDate) => {
+    const orgId = getActiveOrgId();
+    const { data, error } = await supabase
+      .from('receipt_payments')
+      .insert([{
+        receipt_id: receiptId,
+        amount: parseFloat(amount) || 0,
+        payment_date: paymentDate,
+        org_id: orgId
+      }])
+      .select();
+    if (error) throw error;
+    return ensureRowReturned(data, 'receipt_payments');
+  },
+
+  deleteReceiptPayment: async (paymentId) => {
+    const { error } = await supabase
+      .from('receipt_payments')
+      .delete()
+      .eq('id', paymentId)
+      .eq('org_id', getActiveOrgId());
+    if (error) throw error;
+    return { success: true };
   },
 
   updateReceiptPhoto: async (id, photoData) => {

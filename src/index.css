@@ -950,7 +950,9 @@ body {
   }
 
   .thermal-receipt-print,
-  .thermal-receipt-print * {
+  .thermal-receipt-print *,
+  #invoice-preview,
+  #invoice-preview * {
     visibility: visible !important;
   }
 

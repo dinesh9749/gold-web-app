@@ -482,7 +482,7 @@ const Invoice = () => {
   const handlePrint = () => {
     const printContent = document.getElementById("invoice-preview");
     const originalContents = document.body.innerHTML;
-    document.body.innerHTML = printContent.innerHTML;
+    document.body.innerHTML = printContent.outerHTML;
     window.print();
     document.body.innerHTML = originalContents;
     window.location.reload();
