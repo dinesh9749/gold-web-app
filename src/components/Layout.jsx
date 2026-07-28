@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation, Navigate, useNavigate } from 'react-router-dom';
 
 // Icons as inline SVGs for clean, lightweight rendering
@@ -90,43 +90,69 @@ const icons = {
   ),
 };
 
-
-const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { to: '/Invoice', label: 'Invoice', icon: 'invoice' },
-  { to: '/Receipt', label: 'Receipt', icon: 'receipt' },
-  { to: '/Rateinput', label: 'Rate Input', icon: 'rate' },
-  { to: '/CustomerView', label: 'Customers', icon: 'customers' },
-  { to: '/SalesOrders', label: 'Sales Orders', icon: 'orders' },
-  { to: '/MsDigiGold', label: 'DigiGold', icon: 'digi' },
-  { to: '/MsSolderingEngraving', label: 'M.S. Soldering & Engraving', icon: 'soldering' },
-  { to: '/attendance', label: 'Attendance', icon: 'attendance' },
-  { to: '/employee-setup', label: 'Employee Setup', icon: 'empsetup' },
-  { to: '/poster-create', label: 'Poster Creator', icon: 'poster' },
-  { to: '/stock', label: 'Stock Inventory', icon: 'stock' },
-  { to: '/settings', label: 'Settings', icon: 'settings' },
+const ERP_MODULES = [
+  { id: 'gold_retail', name: 'Gold Retail ERP', icon: '🏆', defaultPath: '/dashboard', featureKey: 'gold_retail_enabled' },
+  { id: 'silver_retail', name: 'Silver Retail ERP', icon: '🥈', defaultPath: '/silver-retail-dashboard', featureKey: 'silver_retail_enabled' },
 ];
 
+const erpNavItemsMap = {
+  gold_retail: [
+    { to: '/dashboard', label: 'Gold Dashboard', icon: 'dashboard', section: 'main' },
+    { to: '/Invoice', label: 'Invoice', icon: 'invoice', section: 'main' },
+    { to: '/Receipt', label: 'Receipt', icon: 'receipt', section: 'main' },
+    { to: '/Rateinput', label: 'Rate Input', icon: 'rate', section: 'main' },
+    { to: '/CustomerView', label: 'Customers', icon: 'customers', section: 'mgmt' },
+    { to: '/SalesOrders', label: 'Sales Orders', icon: 'orders', section: 'mgmt' },
+    { to: '/MsDigiGold', label: 'DigiGold', icon: 'digi', section: 'mgmt' },
+    { to: '/MsSolderingEngraving', label: 'M.S. Soldering & Engraving', icon: 'soldering', section: 'mgmt' },
+    { to: '/attendance', label: 'Attendance', icon: 'attendance', section: 'mgmt' },
+    { to: '/employee-setup', label: 'Employee Setup', icon: 'empsetup', section: 'mgmt' },
+    { to: '/poster-create', label: 'Poster Creator', icon: 'poster', section: 'mgmt' },
+    { to: '/stock', label: 'Stock Inventory', icon: 'stock', section: 'mgmt' },
+    { to: '/settings', label: 'Settings', icon: 'settings', section: 'mgmt' },
+  ],
+  silver_retail: [
+    { to: '/silver-retail-dashboard', label: 'Silver Retail Dashboard', icon: 'dashboard', section: 'main' },
+    { to: '/silver-retail/invoice', label: 'Silver Retail Invoice', icon: 'invoice', section: 'main' },
+    { to: '/silver-retail/stock', label: 'Silver Stock Inventory', icon: 'stock', section: 'main' },
+    { to: '/silver-retail/customer-ledger', label: 'Customer Ledger', icon: 'customers', section: 'mgmt' },
+    { to: '/silver-retail/sales-return', label: 'Sales Return', icon: 'receipt', section: 'mgmt' },
+    { to: '/silver-retail/rateinput', label: 'Rate Input', icon: 'rate', section: 'main' },
+    { to: '/CustomerView', label: 'Customers', icon: 'customers', section: 'mgmt' },
+    { to: '/attendance', label: 'Attendance', icon: 'attendance', section: 'mgmt' },
+    { to: '/employee-setup', label: 'Employee Setup', icon: 'empsetup', section: 'mgmt' },
+    { to: '/settings', label: 'Settings', icon: 'settings', section: 'mgmt' },
+  ],
+};
 
 const pageTitles = {
-  dashboard: 'Dashboard',
+  dashboard: 'Gold Retail Dashboard',
+  'silver-retail-dashboard': 'Silver Retail ERP Dashboard',
+  'silver-retail/invoice': 'Silver Retail Invoice',
+  'silver-retail/stock': 'Silver Stock Inventory',
+  'silver-retail/customer-ledger': 'Silver Customer Ledger',
+  'silver-retail/sales-return': 'Silver Sales Return',
+  'silver-retail/rateinput': 'Silver Rate Input & Audit Log',
   invoice: 'Invoice',
   receipt: 'Receipt',
   rateinput: 'Rate Input',
-  customerview: 'Customers',
+  customerview: 'Customers & Dealers',
   salesorders: 'Sales Orders',
   msdigigold: 'DigiGold',
   mssolderingengraving: 'M.S. Soldering & Engraving',
   settings: 'Settings',
   'poster-create': 'Poster Creator',
   stock: 'Stock Inventory',
+  attendance: 'Attendance',
+  'employee-setup': 'Employee Setup',
 };
 
 function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname.split('/')[1]?.toLowerCase();
-  const pageTitle = pageTitles[currentPath] || 'Dashboard';
+  const fullPathKey = location.pathname.replace(/^\//, '').toLowerCase();
+  const pageTitle = pageTitles[fullPathKey] || pageTitles[currentPath] || 'Dashboard';
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -134,17 +160,57 @@ function Layout() {
   const userRole = localStorage.getItem("goldApp_userRole");
   const isAdmin = true;
 
+  // Detect active ERP module from URL or localStorage
+  const getInitialErp = () => {
+    if (fullPathKey.startsWith('silver-retail')) return 'silver_retail';
+    return localStorage.getItem('activeErpModule') || 'gold_retail';
+  };
+
+  const [activeErpModule, setActiveErpModule] = useState(getInitialErp);
+
+  useEffect(() => {
+    if (fullPathKey.startsWith('silver-retail')) {
+      setActiveErpModule('silver_retail');
+      localStorage.setItem('activeErpModule', 'silver_retail');
+    } else if (currentPath === 'dashboard') {
+      setActiveErpModule('gold_retail');
+      localStorage.setItem('activeErpModule', 'gold_retail');
+    }
+  }, [fullPathKey, currentPath]);
+
+  const handleErpSwitch = (erpId) => {
+    setActiveErpModule(erpId);
+    localStorage.setItem('activeErpModule', erpId);
+    const targetModule = ERP_MODULES.find(m => m.id === erpId);
+    if (targetModule) {
+      navigate(targetModule.defaultPath);
+    }
+  };
+
   const displayName = userRole === "superadmin" ? "Super Admin" : (org?.name || "Original Store");
   const displayRole = userRole === "superadmin" ? "Master Account" : "Store Partner";
   const avatarLetter = displayName.charAt(0).toUpperCase();
+
+  // Filter allowed ERP modules for this organization
+  const allowedErpModules = ERP_MODULES.filter(mod => {
+    if (userRole === 'superadmin') return true;
+    if (!org || !org.features) return true;
+    return org.features[mod.featureKey] !== false;
+  });
 
   const isFeatureEnabled = (to) => {
     if (userRole === "superadmin") return true;
     if (!org) return false;
     if (!org.features) return true;
-    const key = to.replace("/", "").toLowerCase();
+    const key = to.replace(/^\//, "").toLowerCase();
     const featureMap = {
       dashboard: 'dashboard_enabled',
+      'silver-retail-dashboard': 'silver_retail_dashboard_enabled',
+      'silver-retail/invoice': 'silver_retail_invoice_enabled',
+      'silver-retail/stock': 'silver_retail_stock_enabled',
+      'silver-retail/customer-ledger': 'silver_retail_ledger_enabled',
+      'silver-retail/sales-return': 'silver_retail_return_enabled',
+      'silver-retail/rateinput': 'silver_retail_rateinput_enabled',
       invoice: 'invoice_enabled',
       receipt: 'receipt_enabled',
       rateinput: 'rateinput_enabled',
@@ -160,13 +226,16 @@ function Layout() {
     };
     const featureKey = featureMap[key];
     if (!featureKey) return true;
-    return !!org.features[featureKey];
+    return org.features[featureKey] !== false;
   };
 
-  const allowedNavItems = navItems.filter(item => isFeatureEnabled(item.to));
+  const currentNavItems = (erpNavItemsMap[activeErpModule] || erpNavItemsMap.gold_retail)
+    .filter(item => isFeatureEnabled(item.to));
 
-  const mainMenu = allowedNavItems.filter(item => ['/dashboard', '/Invoice', '/Receipt', '/Rateinput'].includes(item.to));
-  const managementMenu = allowedNavItems.filter(item => !['/dashboard', '/Invoice', '/Receipt', '/Rateinput'].includes(item.to));
+  const mainMenu = currentNavItems.filter(item => item.section === 'main');
+  const managementMenu = currentNavItems.filter(item => item.section === 'mgmt');
+
+  const currentModuleInfo = ERP_MODULES.find(m => m.id === activeErpModule) || ERP_MODULES[0];
 
   return (
     <div className={`app-layout ${isMobileSidebarOpen ? 'sidebar-open' : ''}`}>
@@ -180,44 +249,81 @@ function Layout() {
 
       {/* ── SIDEBAR ─────────────────────────────────────────── */}
       <aside className="sidebar">
-        {/* Logo */}
+        {/* Company Logo */}
         <div className="sidebar-logo">
           <div className="sidebar-logo-inner">
             <div className="sidebar-logo-icon">💎</div>
             <div className="sidebar-logo-text">
               <span className="sidebar-logo-name" style={{ fontSize: displayName.length > 15 ? '13px' : '15px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', maxWidth: '160px' }} title={displayName}>{displayName}</span>
-              <span className="sidebar-logo-sub">ERP SOFTWARE</span>
+              <span className="sidebar-logo-sub">DK NOVA TECHNOLOGIES</span>
             </div>
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="sidebar-nav">
-          <div className="nav-section-label">Main Menu</div>
-          {mainMenu.map(item => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-              onClick={() => setIsMobileSidebarOpen(false)}
-            >
-              <span className="nav-link-icon">{icons[item.icon]}</span>
-              {item.label}
-            </NavLink>
-          ))}
+        {/* ERP Module Switcher Selector */}
+        <div style={{ padding: '0 16px 14px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--gold-300)', textTransform: 'uppercase', marginBottom: 6, letterSpacing: '0.05em' }}>
+            Software Module
+          </div>
+          <select
+            value={activeErpModule}
+            onChange={(e) => handleErpSwitch(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: 10,
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-default)',
+              color: 'var(--text-primary)',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              outline: 'none'
+            }}
+          >
+            {allowedErpModules.map(mod => (
+              <option key={mod.id} value={mod.id}>
+                {mod.icon} {mod.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          <div className="nav-section-label" style={{ marginTop: 8 }}>Management</div>
-          {managementMenu.map(item => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
-              onClick={() => setIsMobileSidebarOpen(false)}
-            >
-              <span className="nav-link-icon">{icons[item.icon]}</span>
-              {item.label}
-            </NavLink>
-          ))}
+        {/* Navigation */}
+        <nav className="sidebar-nav" style={{ paddingTop: 12 }}>
+          {mainMenu.length > 0 && (
+            <>
+              <div className="nav-section-label">Main Menu</div>
+              {mainMenu.map(item => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                  onClick={() => setIsMobileSidebarOpen(false)}
+                >
+                  <span className="nav-link-icon">{icons[item.icon]}</span>
+                  {item.label}
+                </NavLink>
+              ))}
+            </>
+          )}
+
+          {managementMenu.length > 0 && (
+            <>
+              <div className="nav-section-label" style={{ marginTop: 12 }}>Management</div>
+              {managementMenu.map(item => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                  onClick={() => setIsMobileSidebarOpen(false)}
+                >
+                  <span className="nav-link-icon">{icons[item.icon]}</span>
+                  {item.label}
+                </NavLink>
+              ))}
+            </>
+          )}
         </nav>
 
         {/* Footer */}
@@ -289,7 +395,8 @@ function Layout() {
               </svg>
             </button>
             <span className="topbar-title-dot" />
-            {pageTitle}
+            <span style={{ fontWeight: 800, color: 'var(--gold-300)', marginRight: 8 }}>{currentModuleInfo.icon} {currentModuleInfo.name}</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>/ {pageTitle}</span>
           </div>
           <div className="topbar-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span className="topbar-badge">✦ {displayName}</span>

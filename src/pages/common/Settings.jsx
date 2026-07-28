@@ -156,7 +156,7 @@ export default function Settings() {
       <div className="card" style={{ maxWidth: 600 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 12 }}>ℹ️ App Info</div>
         {[
-          { label: 'App Name',    value: 'MS Gold Attendance Manager' },
+          { label: 'App Name',    value: 'DK Nova Technologies Gold & Silver ERP' },
           { label: 'Version',     value: '2.0.0' },
           { label: 'Database',    value: 'Supabase (cloud)' },
         ].map(row => (

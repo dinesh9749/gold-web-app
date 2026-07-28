@@ -44,6 +44,8 @@ const Invoice = () => {
     }
   }, [showPhotoManager]);
 
+  const [paperSize, setPaperSize] = useState("A4");
+
   const [invoiceData, setInvoiceData] = useState({
     id: null,
     invoiceNo: "",
@@ -1050,9 +1052,37 @@ const Invoice = () => {
       {/* PREVIEW MODAL */}
       {showPreview && (
         <div className="modal-overlay">
-          <div className="modal-box" style={{ maxWidth: 840 }}>
+          <div className="modal-box" style={{ maxWidth: paperSize === "A4" ? 840 : 595, transition: 'max-width 0.2s ease-in-out' }}>
             <div className="modal-header">
-              <div className="modal-title">✦ GST Tax Invoice Preview</div>
+              <div className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span>✦ GST Tax Invoice Preview</span>
+                <div style={{ display: 'flex', border: '1px solid var(--border-default)', borderRadius: 6, overflow: 'hidden' }}>
+                  <button
+                    type="button"
+                    onClick={() => setPaperSize("A4")}
+                    style={{
+                      padding: '4px 10px', fontSize: 11, border: 'none', cursor: 'pointer',
+                      background: paperSize === "A4" ? "var(--gold-200)" : "var(--bg-elevated)",
+                      color: paperSize === "A4" ? "#000" : "var(--text-primary)",
+                      fontWeight: paperSize === "A4" ? 700 : 500
+                    }}
+                  >
+                    A4 Size
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaperSize("A5")}
+                    style={{
+                      padding: '4px 10px', fontSize: 11, border: 'none', cursor: 'pointer',
+                      background: paperSize === "A5" ? "var(--gold-200)" : "var(--bg-elevated)",
+                      color: paperSize === "A5" ? "#000" : "var(--text-primary)",
+                      fontWeight: paperSize === "A5" ? 700 : 500
+                    }}
+                  >
+                    A5 Size
+                  </button>
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={handlePrint} className="btn-primary" style={{ padding: '6px 14px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Printer size={14} /> Print Bill
@@ -1061,8 +1091,54 @@ const Invoice = () => {
               </div>
             </div>
 
-            <div className="modal-body" style={{ background: '#fffdf5', color: '#0f172a', padding: 36, fontFamily: 'serif' }}>
-              <div id="invoice-preview">
+            <div className="modal-body" style={{ background: '#fffdf5', color: '#0f172a', padding: paperSize === "A4" ? 36 : 24, fontFamily: 'serif' }}>
+              <div id="invoice-preview" className={`paper-${paperSize.toLowerCase()}`}>
+                <style dangerouslySetInnerHTML={{ __html: `
+                  @media print {
+                    @page {
+                      size: ${paperSize === "A4" ? "A4" : "A5"};
+                      margin: 0 !important;
+                    }
+                    body {
+                      margin: 0 !important;
+                      padding: 0 !important;
+                      visibility: hidden;
+                    }
+                    .paper-a4 {
+                      width: 100% !important;
+                      min-height: 297mm !important;
+                      padding: 12mm 15mm !important;
+                      box-sizing: border-box !important;
+                      margin: 0 auto !important;
+                      font-size: 12px !important;
+                      visibility: visible !important;
+                    }
+                    .paper-a4 * {
+                      visibility: visible !important;
+                    }
+                    .paper-a5 {
+                      width: 100% !important;
+                      min-height: 210mm !important;
+                      padding: 8mm 10mm !important;
+                      box-sizing: border-box !important;
+                      margin: 0 auto !important;
+                      font-size: 9.5px !important;
+                      visibility: visible !important;
+                    }
+                    .paper-a5 * {
+                      visibility: visible !important;
+                    }
+                    .paper-a5 table {
+                      font-size: 8.5px !important;
+                    }
+                    .paper-a5 th, .paper-a5 td {
+                      padding: 4px 3px !important;
+                    }
+                    .paper-a5 .signatory-section {
+                      margin-top: 20px !important;
+                    }
+                  }
+                `}} />
                 {/* Print Invoice Header */}
                 <div style={{ textAlign: 'center', marginBottom: 20 }}>
                   <h2 style={{ margin: '0 0 4px 0', fontSize: 24, letterSpacing: 0.5, fontWeight: 800 }}>M S GOLD SMITH</h2>
@@ -1195,7 +1271,7 @@ const Invoice = () => {
                 </div>
 
                 {/* Declarations & Signature */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 36, fontSize: 12 }}>
+                <div className="signatory-section" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 36, fontSize: 12 }}>
                   <div style={{ width: '60%' }}>
                     <p style={{ margin: 0 }}><strong>Declaration:</strong></p>
                     <p style={{ margin: '4px 0 0 0', fontSize: 10, lineHeight: 1.4 }}>

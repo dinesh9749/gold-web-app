@@ -465,17 +465,17 @@ export default function MsSolderingEngraving() {
                         {previewJob.product}
                       </td>
                       <td style={{ paddingTop: 6, paddingBottom: 4, textAlign: 'right', verticalAlign: 'top' }}>
-                        {previewJob.markingCharges.toFixed(2)}
+                        {(Number(previewJob.markingCharges) || 0).toFixed(2)}
                       </td>
                     </tr>
                     <tr>
-                      <td style={{ paddingY: 3, color: '#334155' }}>GST (5%)</td>
-                      <td style={{ paddingY: 3, textAlign: 'right' }}>{previewJob.gstAmount.toFixed(2)}</td>
+                      <td style={{ paddingTop: 3, paddingBottom: 3, color: '#334155' }}>GST (5%)</td>
+                      <td style={{ paddingTop: 3, paddingBottom: 3, textAlign: 'right' }}>{(Number(previewJob.gstAmount) || 0).toFixed(2)}</td>
                     </tr>
                     <tr style={{ fontWeight: 'bold', borderTop: '1px dashed #b45309' }}>
                       <td style={{ paddingTop: 6 }}>Net Amount</td>
                       <td style={{ paddingTop: 6, textAlign: 'right', fontSize: 13 }}>
-                        ₹{previewJob.totalAmount.toFixed(2)}
+                        ₹{(Number(previewJob.totalAmount) || 0).toFixed(2)}
                       </td>
                     </tr>
                   </tbody>
@@ -485,7 +485,7 @@ export default function MsSolderingEngraving() {
 
                 <div style={{ textAlign: 'center', fontSize: 9 }}>
                   <p style={{ margin: '2px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
-                  <p style={{ margin: '2px 0', color: '#334155' }}>M.S. Gold Jewellery ERP</p>
+                  <p style={{ margin: '2px 0', color: '#334155' }}>DK Nova Technologies ERP</p>
                 </div>
               </div>
             </div>
@@ -493,54 +493,60 @@ export default function MsSolderingEngraving() {
         </div>
       )}
 
-      {/* ── DYNAMIC INVISIBLE PRINTER ELEMENT ─────────────────── */}
+      {/* ── DYNAMIC PRINTER ELEMENT FOR THERMAL RECEIPT ─────────── */}
       {previewJob && (
-        <div className="thermal-receipt-print" style={{ display: 'none' }}>
+        <div className="thermal-receipt-print">
           <div style={{ textAlign: 'center', marginBottom: 10 }}>
-            <h2 style={{ margin: '0 0 2px 0', fontSize: 13, fontWeight: 'bold' }}>M S GOLD SMITH</h2>
-            <p style={{ margin: '1px 0', fontSize: 8 }}>No.37C, Chettiyakudi South Street, Nadaga Salai,</p>
-            <p style={{ margin: '1px 0', fontSize: 8 }}>Srivilliputhur, Virudhunagar - 626 125.</p>
-            <p style={{ margin: '1px 0', fontSize: 8 }}>GSTIN: 33BDVPR1363J1Z2 | Ph: 94431 12034</p>
-            <div style={{ margin: '6px 0', borderBottom: '1px dashed #b45309' }} />
-            <h3 style={{ margin: '0', fontSize: 10, fontWeight: 'bold' }}>SOLDERING &amp; ENGRAVING</h3>
+            <h2 style={{ margin: '0 0 2px 0', fontSize: 14, fontWeight: 'bold' }}>M S GOLD SMITH</h2>
+            <p style={{ margin: '1px 0', fontSize: 9 }}>No.37C, Chettiyakudi South Street, Nadaga Salai,</p>
+            <p style={{ margin: '1px 0', fontSize: 9 }}>Srivilliputhur, Virudhunagar - 626 125.</p>
+            <p style={{ margin: '1px 0', fontSize: 9 }}>GSTIN: 33BDVPR1363J1Z2 | Ph: 94431 12034</p>
+            <div style={{ margin: '6px 0', borderBottom: '1px dashed #000' }} />
+            <h3 style={{ margin: '0', fontSize: 11, fontWeight: 'bold' }}>SOLDERING &amp; ENGRAVING RECEIPT</h3>
           </div>
 
-          <div style={{ fontSize: 8, marginBottom: 6 }}>
+          <div style={{ fontSize: 10, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <div><strong>Receipt No:</strong> {previewJob.receiptNo}</div>
             <div><strong>Date:</strong> {previewJob.date}</div>
             <div><strong>Customer:</strong> {previewJob.customerName}</div>
           </div>
 
-          <div style={{ borderBottom: '1px dashed #b45309', marginBottom: 6 }} />
+          <div style={{ borderBottom: '1px dashed #000', marginBottom: 8 }} />
 
-          <table style={{ width: '100%', fontSize: 8, borderCollapse: 'collapse', marginBottom: 6 }}>
+          <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse', marginBottom: 8 }}>
             <thead>
-              <tr style={{ borderBottom: '1px dashed #b45309' }}>
-                <th style={{ textAlign: 'left', paddingBottom: 2 }}>Description</th>
-                <th style={{ textAlign: 'right', paddingBottom: 2 }}>Amount (₹)</th>
+              <tr style={{ borderBottom: '1px dashed #000' }}>
+                <th style={{ textAlign: 'left', paddingBottom: 4 }}>Description</th>
+                <th style={{ textAlign: 'right', paddingBottom: 4 }}>Amount (₹)</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td style={{ paddingTop: 4, paddingBottom: 2 }}>{previewJob.product}</td>
-                <td style={{ paddingTop: 4, paddingBottom: 2, textAlign: 'right' }}>{previewJob.markingCharges.toFixed(2)}</td>
+                <td style={{ paddingTop: 6, paddingBottom: 4, verticalAlign: 'top' }}>{previewJob.product}</td>
+                <td style={{ paddingTop: 6, paddingBottom: 4, textAlign: 'right', verticalAlign: 'top' }}>
+                  {(Number(previewJob.markingCharges) || 0).toFixed(2)}
+                </td>
               </tr>
               <tr>
-                <td style={{ paddingY: 2 }}>GST (5%)</td>
-                <td style={{ paddingY: 2, textAlign: 'right' }}>{previewJob.gstAmount.toFixed(2)}</td>
+                <td style={{ paddingTop: 2, paddingBottom: 2, color: '#334155' }}>GST (5%)</td>
+                <td style={{ paddingTop: 2, paddingBottom: 2, textAlign: 'right' }}>
+                  {(Number(previewJob.gstAmount) || 0).toFixed(2)}
+                </td>
               </tr>
-              <tr style={{ fontWeight: 'bold', borderTop: '1px dashed #b45309' }}>
-                <td style={{ paddingTop: 4 }}>Net Total</td>
-                <td style={{ paddingTop: 4, textAlign: 'right' }}>₹{previewJob.totalAmount.toFixed(2)}</td>
+              <tr style={{ fontWeight: 'bold', borderTop: '1px dashed #000' }}>
+                <td style={{ paddingTop: 6 }}>Net Total</td>
+                <td style={{ paddingTop: 6, textAlign: 'right', fontSize: 12 }}>
+                  ₹{(Number(previewJob.totalAmount) || 0).toFixed(2)}
+                </td>
               </tr>
             </tbody>
           </table>
 
-          <div style={{ borderBottom: '1px dashed #b45309', marginTop: 6, marginBottom: 8 }} />
+          <div style={{ borderBottom: '1px dashed #000', marginTop: 8, marginBottom: 8 }} />
 
-          <div style={{ textAlign: 'center', fontSize: 7 }}>
-            <p style={{ margin: '1px 0' }}>Thank you! Visit again!</p>
-            <p style={{ margin: '1px 0' }}>M.S. Gold Jewellery ERP</p>
+          <div style={{ textAlign: 'center', fontSize: 9 }}>
+            <p style={{ margin: '2px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
+            <p style={{ margin: '2px 0', color: '#334155' }}>DK Nova Technologies ERP</p>
           </div>
         </div>
       )}

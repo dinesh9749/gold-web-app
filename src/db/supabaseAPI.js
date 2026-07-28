@@ -66,6 +66,25 @@ export const supabaseAPI = {
     return { success: true };
   },
 
+  updateOrganizationFeatures: async (id, updatedFeatures) => {
+    const { error } = await supabase
+      .from('organizations')
+      .update({
+        features: updatedFeatures
+      })
+      .eq('id', id);
+    if (error) throw error;
+
+    // Update active org in local storage if editing active tenant session
+    const currentOrg = JSON.parse(localStorage.getItem("goldApp_org") || "null");
+    if (currentOrg && currentOrg.id === id) {
+      currentOrg.features = updatedFeatures;
+      localStorage.setItem("goldApp_org", JSON.stringify(currentOrg));
+    }
+
+    return { success: true };
+  },
+
   deleteOrganization: async (id) => {
     const { error } = await supabase
       .from('organizations')
@@ -1173,5 +1192,125 @@ export const supabaseAPI = {
       .eq('org_id', getActiveOrgId());
     if (error) throw error;
     return { changes: 1 };
+  },
+
+  // --- SILVER RETAIL SUPABASE API ---
+  getSilverRates: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('silver_rates')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      if (!data || data.length === 0) return { success: true, rates: { silver999: 98.50, silver925: 91.10, silver800: 78.80 } };
+      return {
+        success: true,
+        rates: {
+          silver999: parseFloat(data[0].silver_999) || 98.50,
+          silver925: parseFloat(data[0].silver_925) || 91.10,
+          silver800: parseFloat(data[0].silver_800) || 78.80,
+          updatedAt: data[0].updated_at
+        }
+      };
+    } catch (err) {
+      console.error("Error loading Silver Rates from Supabase:", err);
+      return { success: false, error: err.message };
+    }
+  },
+
+  saveSilverRates: async (silver999, silver925, silver800) => {
+    const { data, error } = await supabase
+      .from('silver_rates')
+      .insert([{
+        silver_999: parseFloat(silver999),
+        silver_925: parseFloat(silver925),
+        silver_800: parseFloat(silver800)
+      }])
+      .select();
+    if (error) throw error;
+    return { success: true, id: data[0]?.id };
+  },
+
+  getAllSilverStock: async () => {
+    const { data, error } = await supabase
+      .from('silver_stock')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data.map(r => ({
+      id: r.id,
+      tagNumber: r.tag_number,
+      title: r.title,
+      category: r.category,
+      grossWeight: parseFloat(r.gross_weight) || 0,
+      stoneWeight: parseFloat(r.stone_weight) || 0,
+      netWeight: parseFloat(r.net_weight) || 0,
+      purity: parseFloat(r.purity) || 92.5,
+      wastagePercent: parseFloat(r.wastage_percent) || 0,
+      makingChargePerGram: parseFloat(r.making_charge_per_gram) || 0,
+      flatMakingCharge: parseFloat(r.flat_making_charge) || 0,
+      counter: r.counter,
+      status: r.status,
+      createdAt: r.created_at
+    }));
+  },
+
+  saveSilverInvoice: async (invoiceData) => {
+    const { data: inv, error: invErr } = await supabase
+      .from('silver_invoices')
+      .insert([{
+        invoice_no: invoiceData.invoiceNo,
+        customer_name: invoiceData.customerName,
+        customer_mobile: invoiceData.customerMobile || null,
+        customer_gstin: invoiceData.customerGstin || null,
+        invoice_date: invoiceData.invoiceDate || new Date().toISOString().split('T')[0],
+        subtotal: invoiceData.subtotal,
+        discount: invoiceData.discount || 0,
+        exchange_credit: invoiceData.exchangeCredit || 0,
+        net_payable: invoiceData.netPayable,
+        payment_mode: invoiceData.paymentMode || 'UPI',
+        status: 'Paid'
+      }])
+      .select();
+    if (invErr) throw invErr;
+    const invId = inv[0].id;
+
+    // Line items
+    if (invoiceData.items && invoiceData.items.length > 0) {
+      const lineItems = invoiceData.items.map(it => ({
+        invoice_id: invId,
+        tag_number: it.tagNumber || null,
+        title: it.title,
+        gross_weight: it.grossWeight,
+        stone_weight: it.stoneWeight || 0,
+        net_weight: it.netWeight,
+        purity: it.purity,
+        rate_per_gram: it.ratePerGram,
+        wastage_percent: it.wastagePercent || 0,
+        fine_weight: it.fineWeight,
+        making_charges: it.makingCharges || 0,
+        silver_value: it.silverValue,
+        tax_amount: it.taxAmount || 0,
+        total_amount: it.totalAmount
+      }));
+      await supabase.from('silver_invoice_items').insert(lineItems);
+    }
+
+    // Old silver exchange
+    if (invoiceData.oldSilverExchange) {
+      const ex = invoiceData.oldSilverExchange;
+      await supabase.from('silver_old_exchange').insert([{
+        invoice_id: invId,
+        description: ex.description,
+        gross_weight: ex.grossWeight,
+        touch_purity: ex.touchPurity,
+        deduction_percent: ex.deductionPercent || 0,
+        fine_weight_credit: ex.fineWeightCredit,
+        credit_value: ex.creditValue
+      }]);
+    }
+
+    return { id: invId };
   }
 };
