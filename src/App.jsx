@@ -7,6 +7,7 @@ import { Analytics } from "@vercel/analytics/react";
 
 // Gold Retail ERP Pages
 import Dashboard from './pages/goldRetail/Dashboard';
+import GoldReports from './pages/goldRetail/GoldReports';
 import Invoice from './pages/goldRetail/Invoice';
 import CustomerView from './pages/goldRetail/CustomerView';
 import SalesOrders from './pages/goldRetail/SalesOrders';
@@ -42,7 +43,7 @@ function DynamicIndexRedirect() {
   const activeErp = localStorage.getItem("activeErpModule") || "gold_retail";
 
   const hasGold = !org || !org.features || org.features.gold_retail_enabled !== false;
-  const hasSilverRetail = org && org.features && org.features.silver_retail_enabled === true;
+  const hasSilverRetail = !org || !org.features || org.features.silver_retail_enabled !== false;
 
   if (activeErp === 'silver_retail' && hasSilverRetail) {
     return <Navigate to="/silver-retail-dashboard" replace />;
@@ -79,6 +80,7 @@ function App() {
 
             {/* Gold Retail ERP Routes */}
             <Route path="dashboard" element={<FeatureGuard erpModuleKey="gold_retail_enabled" featureKey="dashboard_enabled"><Dashboard /></FeatureGuard>} />
+            <Route path="gold-reports" element={<FeatureGuard erpModuleKey="gold_retail_enabled" featureKey="reports_enabled"><GoldReports /></FeatureGuard>} />
             <Route path="Invoice" element={<FeatureGuard erpModuleKey="gold_retail_enabled" featureKey="invoice_enabled"><Invoice /></FeatureGuard>} />
             <Route path="Receipt" element={<FeatureGuard erpModuleKey="gold_retail_enabled" featureKey="receipt_enabled"><Receipt /></FeatureGuard>} />
             <Route path="SalesOrders" element={<FeatureGuard erpModuleKey="gold_retail_enabled" featureKey="salesorders_enabled"><SalesOrders /></FeatureGuard>} />

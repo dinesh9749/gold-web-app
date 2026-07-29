@@ -3,15 +3,55 @@ import { Printer, Save, Trash, Eye, RefreshCw, X } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 const incrementInvoiceNo = (invNo) => {
   if (!invNo) return 'INV-1001';
-  const match = invNo.match(/^(.*?)(\d+)$/);
+  const match = String(invNo).match(/^(.*?)(\d+)$/);
   if (!match) {
-    return invNo + "-1";
+    return String(invNo) + "-1";
   }
   const prefix = match[1];
   const numberStr = match[2];
   const nextNumber = parseInt(numberStr, 10) + 1;
   const paddedNumber = String(nextNumber).padStart(numberStr.length, '0');
   return prefix + paddedNumber;
+};
+
+const getNextInvoiceSequence = (settingNo, existingInvoices) => {
+  const defaultBase = settingNo || 'INV-1001';
+  if (!existingInvoices || existingInvoices.length === 0) {
+    return defaultBase;
+  }
+
+  let highestNum = -1;
+  let highestStr = defaultBase;
+
+  existingInvoices.forEach(inv => {
+    const invNumStr = inv.invoiceNumber || inv.invoiceNo;
+    if (invNumStr) {
+      const match = String(invNumStr).match(/^(.*?)(\d+)$/);
+      if (match) {
+        const num = parseInt(match[2], 10);
+        if (num > highestNum) {
+          highestNum = num;
+          highestStr = invNumStr;
+        }
+      }
+    }
+  });
+
+  if (highestNum === -1) {
+    return defaultBase;
+  }
+
+  const nextFromDb = incrementInvoiceNo(highestStr);
+
+  const matchSetting = String(defaultBase).match(/^(.*?)(\d+)$/);
+  if (matchSetting) {
+    const settingNum = parseInt(matchSetting[2], 10);
+    if (settingNum > highestNum + 1) {
+      return defaultBase;
+    }
+  }
+
+  return nextFromDb;
 };
 
 const Invoice = () => {
@@ -83,13 +123,16 @@ const Invoice = () => {
       const custRes = await window.electronAPI?.getAllCustomers();
       if (custRes) setCustomers(custRes);
 
-      // Load next invoice number settings
-      const settingsRes = await window.electronAPI?.getOrganizationSettings();
-      if (settingsRes?.next_invoice_number) {
-        setInvoiceData(prev => ({ ...prev, invoiceNo: settingsRes.next_invoice_number }));
-      } else {
-        setInvoiceData(prev => ({ ...prev, invoiceNo: 'INV-1001' }));
-      }
+      // Load settings and existing invoices to calculate true next sequence number
+      const [settingsRes, invRes] = await Promise.all([
+        window.electronAPI?.getOrganizationSettings(),
+        window.electronAPI?.getAllInvoices()
+      ]);
+
+      if (invRes) setInvoices(invRes);
+      const settingNo = settingsRes?.next_invoice_number || 'INV-1001';
+      const nextSeqNo = getNextInvoiceSequence(settingNo, invRes || []);
+      setInvoiceData(prev => ({ ...prev, invoiceNo: nextSeqNo }));
 
       // Load live gold rates (22K)
       const ratesRes = await window.electronAPI?.getMetalRates();
@@ -128,12 +171,16 @@ const Invoice = () => {
     }
   };
 
-  const handleClosePreview = () => {
+  const handleClosePreview = async () => {
     setShowPreview(false);
     if (!invoiceData.id) {
+      const freshInvoices = (await window.electronAPI?.getAllInvoices()) || invoices;
+      const settingsRes = await window.electronAPI?.getOrganizationSettings();
+      const nextSeqNo = getNextInvoiceSequence(settingsRes?.next_invoice_number, freshInvoices);
+
       setInvoiceData({
         id: null,
-        invoiceNo: "",
+        invoiceNo: nextSeqNo,
         date: new Date().toISOString().split("T")[0],
         customerId: null,
         consignee: "",
@@ -158,16 +205,17 @@ const Invoice = () => {
         productPhoto: null
       });
       setCustSearch("");
-      loadData();
     }
   };
 
   const handleReloadSequence = async () => {
     try {
-      const settingsRes = await window.electronAPI?.getOrganizationSettings();
-      if (settingsRes?.next_invoice_number) {
-        setInvoiceData(prev => ({ ...prev, invoiceNo: settingsRes.next_invoice_number }));
-      }
+      const [settingsRes, invRes] = await Promise.all([
+        window.electronAPI?.getOrganizationSettings(),
+        window.electronAPI?.getAllInvoices()
+      ]);
+      const nextSeqNo = getNextInvoiceSequence(settingsRes?.next_invoice_number, invRes || invoices);
+      setInvoiceData(prev => ({ ...prev, invoiceNo: nextSeqNo }));
     } catch (err) {
       console.error(err);
     }
@@ -469,6 +517,9 @@ const Invoice = () => {
         // Increment and update the next invoice number in settings
         const nextNo = incrementInvoiceNo(invoiceData.invoiceNo);
         await window.electronAPI?.updateOrganizationSettings(nextNo);
+
+        const savedObj = { ...payload, id: res.id, invoiceNo: invoiceData.invoiceNo, invoiceNumber: invoiceData.invoiceNo };
+        setInvoices(prev => [savedObj, ...prev]);
 
         alert("Invoice saved to database successfully!");
         setShowPreview(true);

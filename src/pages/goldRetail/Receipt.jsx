@@ -4,15 +4,55 @@ import { useOutletContext } from "react-router-dom";
 
 const incrementReceiptNo = (recNo) => {
   if (!recNo) return 'REC-1001';
-  const match = recNo.match(/^(.*?)(\d+)$/);
+  const match = String(recNo).match(/^(.*?)(\d+)$/);
   if (!match) {
-    return recNo + "-1";
+    return String(recNo) + "-1";
   }
   const prefix = match[1];
   const numberStr = match[2];
   const nextNumber = parseInt(numberStr, 10) + 1;
   const paddedNumber = String(nextNumber).padStart(numberStr.length, '0');
   return prefix + paddedNumber;
+};
+
+const getNextReceiptSequence = (settingNo, existingReceipts) => {
+  const defaultBase = settingNo || 'REC-1001';
+  if (!existingReceipts || existingReceipts.length === 0) {
+    return defaultBase;
+  }
+
+  let highestNum = -1;
+  let highestStr = defaultBase;
+
+  existingReceipts.forEach(rec => {
+    const recNumStr = rec.receiptNumber || rec.receiptNo;
+    if (recNumStr) {
+      const match = String(recNumStr).match(/^(.*?)(\d+)$/);
+      if (match) {
+        const num = parseInt(match[2], 10);
+        if (num > highestNum) {
+          highestNum = num;
+          highestStr = recNumStr;
+        }
+      }
+    }
+  });
+
+  if (highestNum === -1) {
+    return defaultBase;
+  }
+
+  const nextFromDb = incrementReceiptNo(highestStr);
+
+  const matchSetting = String(defaultBase).match(/^(.*?)(\d+)$/);
+  if (matchSetting) {
+    const settingNum = parseInt(matchSetting[2], 10);
+    if (settingNum > highestNum + 1) {
+      return defaultBase;
+    }
+  }
+
+  return nextFromDb;
 };
 
 const Receipt = () => {
@@ -88,13 +128,16 @@ const Receipt = () => {
       const custRes = await window.electronAPI?.getAllCustomers();
       if (custRes) setCustomers(custRes);
 
-      // Load next receipt number settings
-      const settingsRes = await window.electronAPI?.getOrganizationSettings();
-      if (settingsRes?.next_receipt_number) {
-        setReceiptData(prev => ({ ...prev, receiptNo: settingsRes.next_receipt_number }));
-      } else {
-        setReceiptData(prev => ({ ...prev, receiptNo: 'REC-1001' }));
-      }
+      // Load settings and existing receipts to calculate true next sequence number
+      const [settingsRes, recRes] = await Promise.all([
+        window.electronAPI?.getOrganizationSettings(),
+        window.electronAPI?.getAllReceipts()
+      ]);
+
+      if (recRes) setReceipts(recRes);
+      const settingNo = settingsRes?.next_receipt_number || 'REC-1001';
+      const nextSeqNo = getNextReceiptSequence(settingNo, recRes || []);
+      setReceiptData(prev => ({ ...prev, receiptNo: nextSeqNo }));
 
       // Load live gold rates (22K)
       const ratesRes = await window.electronAPI?.getMetalRates();
@@ -102,7 +145,6 @@ const Receipt = () => {
         const rate = parseFloat(ratesRes.metal_rates[0].gold_rate) || 0;
         setLiveGoldRate(rate);
         
-        // Update default rate in first item if not edited
         setReceiptData(prev => {
           const newItems = [...prev.items];
           newItems[0].rate = rate;
@@ -133,12 +175,16 @@ const Receipt = () => {
     }
   };
 
-  const handleClosePreview = () => {
+  const handleClosePreview = async () => {
     setShowPreview(false);
     if (!receiptData.id) {
+      const freshReceipts = (await window.electronAPI?.getAllReceipts()) || receipts;
+      const settingsRes = await window.electronAPI?.getOrganizationSettings();
+      const nextSeqNo = getNextReceiptSequence(settingsRes?.next_receipt_number, freshReceipts);
+
       setReceiptData({
         id: null,
-        receiptNo: "",
+        receiptNo: nextSeqNo,
         date: new Date().toISOString().split("T")[0],
         customerId: null,
         consignee: "",
@@ -162,16 +208,17 @@ const Receipt = () => {
         productPhoto: null
       });
       setCustSearch("");
-      loadData();
     }
   };
 
   const handleReloadSequence = async () => {
     try {
-      const settingsRes = await window.electronAPI?.getOrganizationSettings();
-      if (settingsRes?.next_receipt_number) {
-        setReceiptData(prev => ({ ...prev, receiptNo: settingsRes.next_receipt_number }));
-      }
+      const [settingsRes, recRes] = await Promise.all([
+        window.electronAPI?.getOrganizationSettings(),
+        window.electronAPI?.getAllReceipts()
+      ]);
+      const nextSeqNo = getNextReceiptSequence(settingsRes?.next_receipt_number, recRes || receipts);
+      setReceiptData(prev => ({ ...prev, receiptNo: nextSeqNo }));
     } catch (err) {
       console.error(err);
     }
@@ -319,6 +366,9 @@ const Receipt = () => {
         // Increment and save the sequence formatting
         const nextNo = incrementReceiptNo(receiptData.receiptNo);
         await window.electronAPI?.updateOrganizationSettings(undefined, nextNo);
+
+        const savedObj = { ...payload, id: res.id, receiptNo: receiptData.receiptNo, receiptNumber: receiptData.receiptNo };
+        setReceipts(prev => [savedObj, ...prev]);
 
         alert("Receipt saved to database successfully!");
         setShowPreview(true);

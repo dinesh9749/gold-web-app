@@ -24,15 +24,21 @@ export const supabaseAPI = {
       .select('*')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return data.map(row => ({
-      id: row.id,
-      name: row.name,
-      loginSlug: row.login_slug,
-      password: row.password,
-      isActive: row.is_active,
-      features: row.features,
-      createdAt: row.created_at
-    }));
+    return data.map(row => {
+      let parsedFeatures = row.features;
+      if (typeof parsedFeatures === 'string') {
+        try { parsedFeatures = JSON.parse(parsedFeatures); } catch (e) { parsedFeatures = {}; }
+      }
+      return {
+        id: row.id,
+        name: row.name,
+        loginSlug: row.login_slug,
+        password: row.password,
+        isActive: row.is_active,
+        features: parsedFeatures || {},
+        createdAt: row.created_at
+      };
+    });
   },
 
   saveOrganization: async (orgData) => {
@@ -63,6 +69,17 @@ export const supabaseAPI = {
       })
       .eq('id', id);
     if (error) throw error;
+
+    // Update active org in local storage if editing active tenant session
+    const currentOrg = JSON.parse(localStorage.getItem("goldApp_org") || "null");
+    if (currentOrg && currentOrg.id === id) {
+      currentOrg.name = orgData.name;
+      currentOrg.loginSlug = orgData.loginSlug;
+      currentOrg.isActive = orgData.isActive !== false;
+      currentOrg.features = orgData.features;
+      localStorage.setItem("goldApp_org", JSON.stringify(currentOrg));
+    }
+
     return { success: true };
   },
 
@@ -103,12 +120,16 @@ export const supabaseAPI = {
       .maybeSingle();
     if (error) throw error;
     if (!data) return null;
+    let parsedFeatures = data.features;
+    if (typeof parsedFeatures === 'string') {
+      try { parsedFeatures = JSON.parse(parsedFeatures); } catch (e) { parsedFeatures = {}; }
+    }
     return {
       id: data.id,
       name: data.name,
       loginSlug: data.login_slug,
       isActive: data.is_active,
-      features: data.features
+      features: parsedFeatures || {}
     };
   },
 
@@ -940,12 +961,20 @@ export const supabaseAPI = {
   updateOrganizationSettings: async (nextInvoiceNumber, nextReceiptNumber) => {
     const org = JSON.parse(localStorage.getItem("goldApp_org") || "null");
     if (!org) return false;
+
+    const updateFields = {};
+    if (nextInvoiceNumber !== undefined && nextInvoiceNumber !== null) {
+      updateFields.next_invoice_number = nextInvoiceNumber;
+    }
+    if (nextReceiptNumber !== undefined && nextReceiptNumber !== null) {
+      updateFields.next_receipt_number = nextReceiptNumber;
+    }
+
+    if (Object.keys(updateFields).length === 0) return true;
+
     const { error } = await supabase
       .from('organizations')
-      .update({
-        next_invoice_number: nextInvoiceNumber,
-        next_receipt_number: nextReceiptNumber
-      })
+      .update(updateFields)
       .eq('id', org.id);
     if (error) throw error;
     return true;
@@ -1312,5 +1341,116 @@ export const supabaseAPI = {
     }
 
     return { id: invId };
+  },
+
+  // --- STATES & CITIES MASTER ---
+  getAllStates: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('states')
+        .select('*')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return data.map(row => ({
+        id: row.id,
+        name: row.name,
+        code: row.code
+      }));
+    } catch (err) {
+      console.warn("Falling back to local states list:", err);
+      const local = JSON.parse(localStorage.getItem("goldApp_states") || "null");
+      return local || [];
+    }
+  },
+
+  addState: async (name, code = '') => {
+    try {
+      const { data, error } = await supabase
+        .from('states')
+        .insert([{ name, code, org_id: getActiveOrgId() }])
+        .select();
+      if (error) throw error;
+      const row = ensureRowReturned(data, 'states');
+      return { id: row.id, name: row.name, code: row.code };
+    } catch (err) {
+      console.warn("Fallback adding state locally:", err);
+      const local = JSON.parse(localStorage.getItem("goldApp_states") || "[]");
+      const newItem = { id: Date.now().toString(), name, code };
+      const updated = [...local, newItem];
+      localStorage.setItem("goldApp_states", JSON.stringify(updated));
+      return newItem;
+    }
+  },
+
+  deleteState: async (id) => {
+    try {
+      const { error } = await supabase
+        .from('states')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn("Fallback deleting state locally:", err);
+      const local = JSON.parse(localStorage.getItem("goldApp_states") || "[]");
+      const updated = local.filter(s => s.id !== id && s.name !== id);
+      localStorage.setItem("goldApp_states", JSON.stringify(updated));
+      return true;
+    }
+  },
+
+  getAllCities: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('cities')
+        .select('*')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return data.map(row => ({
+        id: row.id,
+        name: row.name,
+        stateName: row.state_name
+      }));
+    } catch (err) {
+      console.warn("Falling back to local cities list:", err);
+      const local = JSON.parse(localStorage.getItem("goldApp_cities") || "null");
+      return local || [];
+    }
+  },
+
+  addCity: async (name, stateName = '') => {
+    try {
+      const { data, error } = await supabase
+        .from('cities')
+        .insert([{ name, state_name: stateName, org_id: getActiveOrgId() }])
+        .select();
+      if (error) throw error;
+      const row = ensureRowReturned(data, 'cities');
+      return { id: row.id, name: row.name, stateName: row.state_name };
+    } catch (err) {
+      console.warn("Fallback adding city locally:", err);
+      const local = JSON.parse(localStorage.getItem("goldApp_cities") || "[]");
+      const newItem = { id: Date.now().toString(), name, stateName };
+      const updated = [...local, newItem];
+      localStorage.setItem("goldApp_cities", JSON.stringify(updated));
+      return newItem;
+    }
+  },
+
+  deleteCity: async (id) => {
+    try {
+      const { error } = await supabase
+        .from('cities')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.warn("Fallback deleting city locally:", err);
+      const local = JSON.parse(localStorage.getItem("goldApp_cities") || "[]");
+      const updated = local.filter(c => c.id !== id && c.name !== id);
+      localStorage.setItem("goldApp_cities", JSON.stringify(updated));
+      return true;
+    }
   }
 };

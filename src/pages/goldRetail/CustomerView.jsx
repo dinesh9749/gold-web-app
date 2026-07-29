@@ -14,15 +14,35 @@ const CustomerViewPage = () => {
     city: '', address1: '', address2: '', address3: '', state: ''
   });
 
-  const [cities, setCities] = useState(['Chennai', 'Mumbai', 'Delhi', 'Bangalore', 'Hyderabad']);
-  const [states, setStates] = useState(['Tamil Nadu', 'Maharashtra', 'Delhi', 'Karnataka', 'Telangana']);
+  const [cities, setCities] = useState([]);
+  const [states, setStates] = useState([]);
   const [newCity, setNewCity] = useState('');
   const [newState, setNewState] = useState('');
   const [showCityInput, setShowCityInput] = useState(false);
   const [showStateInput, setShowStateInput] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => { loadCustomers(); }, []);
+  useEffect(() => { 
+    loadCustomers(); 
+    loadLocations();
+  }, []);
+
+  const loadLocations = async () => {
+    try {
+      const [stList, ctList] = await Promise.all([
+        window.electronAPI?.getAllStates ? window.electronAPI.getAllStates() : [],
+        window.electronAPI?.getAllCities ? window.electronAPI.getAllCities() : []
+      ]);
+      if (stList && stList.length > 0) {
+        setStates(stList.map(s => typeof s === 'object' ? s.name : s));
+      }
+      if (ctList && ctList.length > 0) {
+        setCities(ctList.map(c => typeof c === 'object' ? c.name : c));
+      }
+    } catch (err) {
+      console.error("Error loading location master data in CustomerView:", err);
+    }
+  };
 
   const loadCustomers = async () => {
     try {
@@ -78,19 +98,37 @@ const CustomerViewPage = () => {
     }
   };
 
-  const addCity = () => {
+  const addCity = async () => {
     if (newCity.trim()) {
-      setCities(prev => [...prev, newCity.trim()]);
-      setFormData(prev => ({ ...prev, city: newCity.trim() }));
-      setNewCity(''); setShowCityInput(false);
+      const cityName = newCity.trim();
+      setCities(prev => [...prev, cityName]);
+      setFormData(prev => ({ ...prev, city: cityName }));
+      try {
+        if (window.electronAPI?.addCity) {
+          await window.electronAPI.addCity(cityName, formData.state || '');
+        }
+      } catch (e) {
+        console.error("Error adding city:", e);
+      }
+      setNewCity(''); 
+      setShowCityInput(false);
     }
   };
 
-  const addState = () => {
+  const addState = async () => {
     if (newState.trim()) {
-      setStates(prev => [...prev, newState.trim()]);
-      setFormData(prev => ({ ...prev, state: newState.trim() }));
-      setNewState(''); setShowStateInput(false);
+      const stateName = newState.trim();
+      setStates(prev => [...prev, stateName]);
+      setFormData(prev => ({ ...prev, state: stateName }));
+      try {
+        if (window.electronAPI?.addState) {
+          await window.electronAPI.addState(stateName, '');
+        }
+      } catch (e) {
+        console.error("Error adding state:", e);
+      }
+      setNewState(''); 
+      setShowStateInput(false);
     }
   };
 

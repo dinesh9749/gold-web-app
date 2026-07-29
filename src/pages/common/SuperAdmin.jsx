@@ -9,6 +9,7 @@ const INITIAL_FEATURES = {
 
   // Gold Retail Pages
   dashboard_enabled: true,
+  reports_enabled: true,
   invoice_enabled: true,
   receipt_enabled: true,
   rateinput_enabled: true,
@@ -38,6 +39,7 @@ const FEATURE_CATEGORIES = [
     features: [
       { key: 'gold_retail_enabled', label: 'Gold Retail ERP Access (Master Switch)' },
       { key: 'dashboard_enabled', label: 'Gold Dashboard' },
+      { key: 'reports_enabled', label: 'Collective Reports & Analytics' },
       { key: 'invoice_enabled', label: 'Gold Retail Invoice' },
       { key: 'receipt_enabled', label: 'Payment Receipt' },
       { key: 'rateinput_enabled', label: 'Rate Input' },
@@ -71,6 +73,7 @@ const FEATURE_LABELS = {
   gold_retail_enabled: 'Gold Retail ERP Access',
   silver_retail_enabled: 'Silver Retail ERP Access',
   dashboard_enabled: 'Gold Dashboard',
+  reports_enabled: 'Collective Reports',
   invoice_enabled: 'Invoice',
   receipt_enabled: 'Receipt',
   rateinput_enabled: 'Rate Input',
@@ -226,7 +229,7 @@ export default function SuperAdmin() {
   const handleQuickModuleToggle = async (e, org, moduleKey) => {
     e.stopPropagation();
     const currentFeatures = org.features || { ...INITIAL_FEATURES };
-    const currentVal = currentFeatures[moduleKey] !== undefined ? currentFeatures[moduleKey] !== false : (moduleKey === 'gold_retail_enabled');
+    const currentVal = currentFeatures[moduleKey] !== false;
     const updatedVal = !currentVal;
 
     const newFeatures = {
@@ -359,7 +362,7 @@ export default function SuperAdmin() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {organizations.map(org => {
                 const isGoldEnabled = org.features ? (org.features.gold_retail_enabled !== false) : true;
-                const isSilverEnabled = org.features ? (org.features.silver_retail_enabled === true) : false;
+                const isSilverEnabled = org.features ? (org.features.silver_retail_enabled !== false) : true;
 
                 return (
                   <div key={org.id} style={{

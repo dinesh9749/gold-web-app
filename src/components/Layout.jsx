@@ -88,6 +88,13 @@ const icons = {
       <line x1="12" y1="22.08" x2="12" y2="12" />
     </svg>
   ),
+  reports: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  ),
 };
 
 const ERP_MODULES = [
@@ -98,6 +105,7 @@ const ERP_MODULES = [
 const erpNavItemsMap = {
   gold_retail: [
     { to: '/dashboard', label: 'Gold Dashboard', icon: 'dashboard', section: 'main' },
+    { to: '/gold-reports', label: 'Collective Reports', icon: 'reports', section: 'main' },
     { to: '/Invoice', label: 'Invoice', icon: 'invoice', section: 'main' },
     { to: '/Receipt', label: 'Receipt', icon: 'receipt', section: 'main' },
     { to: '/Rateinput', label: 'Rate Input', icon: 'rate', section: 'main' },
@@ -127,6 +135,7 @@ const erpNavItemsMap = {
 
 const pageTitles = {
   dashboard: 'Gold Retail Dashboard',
+  'gold-reports': 'Collective Reports & Analytics',
   'silver-retail-dashboard': 'Silver Retail ERP Dashboard',
   'silver-retail/invoice': 'Silver Retail Invoice',
   'silver-retail/stock': 'Silver Stock Inventory',
@@ -168,6 +177,13 @@ function Layout() {
 
   const [activeErpModule, setActiveErpModule] = useState(getInitialErp);
 
+  // Filter allowed ERP modules for this organization
+  const allowedErpModules = ERP_MODULES.filter(mod => {
+    if (userRole === 'superadmin') return true;
+    if (!org || !org.features) return true;
+    return org.features[mod.featureKey] !== false;
+  });
+
   useEffect(() => {
     if (fullPathKey.startsWith('silver-retail')) {
       setActiveErpModule('silver_retail');
@@ -175,8 +191,15 @@ function Layout() {
     } else if (currentPath === 'dashboard') {
       setActiveErpModule('gold_retail');
       localStorage.setItem('activeErpModule', 'gold_retail');
+    } else if (userRole !== 'superadmin' && allowedErpModules.length > 0) {
+      const isCurrentAllowed = allowedErpModules.some(m => m.id === activeErpModule);
+      if (!isCurrentAllowed) {
+        const fallback = allowedErpModules[0];
+        setActiveErpModule(fallback.id);
+        localStorage.setItem('activeErpModule', fallback.id);
+      }
     }
-  }, [fullPathKey, currentPath]);
+  }, [fullPathKey, currentPath, allowedErpModules, activeErpModule, userRole]);
 
   const handleErpSwitch = (erpId) => {
     setActiveErpModule(erpId);
@@ -190,13 +213,6 @@ function Layout() {
   const displayName = userRole === "superadmin" ? "Super Admin" : (org?.name || "Original Store");
   const displayRole = userRole === "superadmin" ? "Master Account" : "Store Partner";
   const avatarLetter = displayName.charAt(0).toUpperCase();
-
-  // Filter allowed ERP modules for this organization
-  const allowedErpModules = ERP_MODULES.filter(mod => {
-    if (userRole === 'superadmin') return true;
-    if (!org || !org.features) return true;
-    return org.features[mod.featureKey] !== false;
-  });
 
   const isFeatureEnabled = (to) => {
     if (userRole === "superadmin") return true;
@@ -403,6 +419,34 @@ function Layout() {
             <div className="topbar-avatar" title={displayRole}>
               {avatarLetter}
             </div>
+            <button
+              onClick={() => {
+                localStorage.clear();
+                navigate('/login', { replace: true });
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                background: 'rgba(239, 68, 68, 0.08)',
+                color: '#ef4444',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              title="Logout of account"
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              <span>Logout</span>
+            </button>
           </div>
         </header>
 
