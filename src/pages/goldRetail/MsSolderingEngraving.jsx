@@ -495,17 +495,17 @@ export default function MsSolderingEngraving() {
 
       {/* ── DYNAMIC PRINTER ELEMENT FOR THERMAL RECEIPT ─────────── */}
       {previewJob && (
-        <div className="thermal-receipt-print">
+        <div className="thermal-receipt-print" style={{ fontWeight: 'bold' }}>
           <div style={{ textAlign: 'center', marginBottom: 10 }}>
             <h2 style={{ margin: '0 0 2px 0', fontSize: 14, fontWeight: 'bold' }}>M S GOLD SMITH</h2>
-            <p style={{ margin: '1px 0', fontSize: 9 }}>No.37C, Chettiyakudi South Street, Nadaga Salai,</p>
-            <p style={{ margin: '1px 0', fontSize: 9 }}>Srivilliputhur, Virudhunagar - 626 125.</p>
-            <p style={{ margin: '1px 0', fontSize: 9 }}>GSTIN: 33BDVPR1363J1Z2 | Ph: 94431 12034</p>
+            <p className="address-text" style={{ margin: '1px 0', fontSize: 9, fontWeight: 'normal' }}>No.37C, Chettiyakudi South Street, Nadaga Salai,</p>
+            <p className="address-text" style={{ margin: '1px 0', fontSize: 9, fontWeight: 'normal' }}>Srivilliputhur, Virudhunagar - 626 125.</p>
+            <p className="address-text" style={{ margin: '1px 0', fontSize: 9, fontWeight: 'normal' }}>GSTIN: 33BDVPR1363J1Z2 | Ph: 94431 12034</p>
             <div style={{ margin: '6px 0', borderBottom: '1px dashed #000' }} />
             <h3 style={{ margin: '0', fontSize: 11, fontWeight: 'bold' }}>SOLDERING &amp; ENGRAVING RECEIPT</h3>
           </div>
 
-          <div style={{ fontSize: 10, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{ fontSize: 10, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 2, fontWeight: 'bold' }}>
             <div><strong>Receipt No:</strong> {previewJob.receiptNo}</div>
             <div><strong>Date:</strong> {previewJob.date}</div>
             <div><strong>Customer:</strong> {previewJob.customerName}</div>
@@ -513,29 +513,29 @@ export default function MsSolderingEngraving() {
 
           <div style={{ borderBottom: '1px dashed #000', marginBottom: 8 }} />
 
-          <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse', marginBottom: 8 }}>
+          <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse', marginBottom: 8, fontWeight: 'bold' }}>
             <thead>
               <tr style={{ borderBottom: '1px dashed #000' }}>
-                <th style={{ textAlign: 'left', paddingBottom: 4 }}>Description</th>
-                <th style={{ textAlign: 'right', paddingBottom: 4 }}>Amount (₹)</th>
+                <th style={{ textAlign: 'left', paddingBottom: 4, fontWeight: 'bold' }}>Description</th>
+                <th style={{ textAlign: 'right', paddingBottom: 4, fontWeight: 'bold' }}>Amount (₹)</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td style={{ paddingTop: 6, paddingBottom: 4, verticalAlign: 'top' }}>{previewJob.product}</td>
-                <td style={{ paddingTop: 6, paddingBottom: 4, textAlign: 'right', verticalAlign: 'top' }}>
+              <tr style={{ fontWeight: 'bold' }}>
+                <td style={{ paddingTop: 6, paddingBottom: 4, verticalAlign: 'top', fontWeight: 'bold' }}>{previewJob.product}</td>
+                <td style={{ paddingTop: 6, paddingBottom: 4, textAlign: 'right', verticalAlign: 'top', fontWeight: 'bold' }}>
                   {(Number(previewJob.markingCharges) || 0).toFixed(2)}
                 </td>
               </tr>
-              <tr>
-                <td style={{ paddingTop: 2, paddingBottom: 2, color: '#334155' }}>GST (5%)</td>
-                <td style={{ paddingTop: 2, paddingBottom: 2, textAlign: 'right' }}>
+              <tr style={{ fontWeight: 'bold' }}>
+                <td style={{ paddingTop: 2, paddingBottom: 2, color: '#000', fontWeight: 'bold' }}>GST (5%)</td>
+                <td style={{ paddingTop: 2, paddingBottom: 2, textAlign: 'right', fontWeight: 'bold' }}>
                   {(Number(previewJob.gstAmount) || 0).toFixed(2)}
                 </td>
               </tr>
               <tr style={{ fontWeight: 'bold', borderTop: '1px dashed #000' }}>
-                <td style={{ paddingTop: 6 }}>Net Total</td>
-                <td style={{ paddingTop: 6, textAlign: 'right', fontSize: 12 }}>
+                <td style={{ paddingTop: 6, fontWeight: 'bold' }}>Net Total</td>
+                <td style={{ paddingTop: 6, textAlign: 'right', fontSize: 12, fontWeight: 'bold' }}>
                   ₹{(Number(previewJob.totalAmount) || 0).toFixed(2)}
                 </td>
               </tr>
@@ -544,9 +544,9 @@ export default function MsSolderingEngraving() {
 
           <div style={{ borderBottom: '1px dashed #000', marginTop: 6, marginBottom: 6 }} />
 
-          <div style={{ textAlign: 'center', fontSize: 9 }}>
+          <div style={{ textAlign: 'center', fontSize: 9, fontWeight: 'bold' }}>
             <p style={{ margin: '1px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
-            <p style={{ margin: '1px 0', color: '#334155' }}>DK Nova Technologies ERP</p>
+            <p style={{ margin: '1px 0', color: '#000', fontWeight: 'bold' }}>DK Nova Technologies ERP</p>
           </div>
         </div>
       )}
