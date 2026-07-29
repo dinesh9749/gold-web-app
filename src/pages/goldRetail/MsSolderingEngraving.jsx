@@ -427,7 +427,7 @@ export default function MsSolderingEngraving() {
                 color: '#0f172a',
                 width: '100%',
                 maxWidth: '280px',
-                padding: '20px 14px',
+                padding: '14px 14px 8px',
                 boxShadow: '0 4px 20px rgba(217, 119, 6, 0.15)',
                 border: '1px solid var(--border-default)',
                 fontFamily: 'Courier New, Courier, monospace',
@@ -481,11 +481,11 @@ export default function MsSolderingEngraving() {
                   </tbody>
                 </table>
 
-                <div style={{ borderBottom: '1px dashed #b45309', marginTop: 10, marginBottom: 10 }} />
+                <div style={{ borderBottom: '1px dashed #b45309', marginTop: 6, marginBottom: 6 }} />
 
                 <div style={{ textAlign: 'center', fontSize: 9 }}>
-                  <p style={{ margin: '2px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
-                  <p style={{ margin: '2px 0', color: '#334155' }}>DK Nova Technologies ERP</p>
+                  <p style={{ margin: '1px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
+                  <p style={{ margin: '1px 0', color: '#334155' }}>DK Nova Technologies ERP</p>
                 </div>
               </div>
             </div>
@@ -542,11 +542,11 @@ export default function MsSolderingEngraving() {
             </tbody>
           </table>
 
-          <div style={{ borderBottom: '1px dashed #000', marginTop: 8, marginBottom: 8 }} />
+          <div style={{ borderBottom: '1px dashed #000', marginTop: 6, marginBottom: 6 }} />
 
           <div style={{ textAlign: 'center', fontSize: 9 }}>
-            <p style={{ margin: '2px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
-            <p style={{ margin: '2px 0', color: '#334155' }}>DK Nova Technologies ERP</p>
+            <p style={{ margin: '1px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
+            <p style={{ margin: '1px 0', color: '#334155' }}>DK Nova Technologies ERP</p>
           </div>
         </div>
       )}
