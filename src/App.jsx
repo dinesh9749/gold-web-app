@@ -17,7 +17,6 @@ import Rateinput from './pages/goldRetail/Rateinput';
 import Receipt from './pages/goldRetail/Receipt';
 import Attendance from './pages/goldRetail/Attendance';
 import EmployeeSetup from './pages/goldRetail/EmployeeSetup';
-import PosterCreate from './pages/goldRetail/PosterCreate';
 import Stock from './pages/goldRetail/Stock';
 
 // Silver Retail ERP Pages
@@ -86,7 +85,6 @@ function App() {
             <Route path="SalesOrders" element={<FeatureGuard erpModuleKey="gold_retail_enabled" featureKey="salesorders_enabled"><SalesOrders /></FeatureGuard>} />
             <Route path="MsDigiGold" element={<FeatureGuard erpModuleKey="gold_retail_enabled" featureKey="digigold_enabled"><MsDigiGold /></FeatureGuard>} />
             <Route path="MsSolderingEngraving" element={<FeatureGuard erpModuleKey="gold_retail_enabled" featureKey="soldering_enabled"><MsSolderingEngraving /></FeatureGuard>} />
-            <Route path="poster-create" element={<FeatureGuard erpModuleKey="gold_retail_enabled" featureKey="poster_enabled"><PosterCreate /></FeatureGuard>} />
 
             {/* Silver Retail ERP Routes */}
             <Route path="silver-retail-dashboard" element={<FeatureGuard erpModuleKey="silver_retail_enabled" featureKey="silver_retail_dashboard_enabled"><SilverRetailDashboard /></FeatureGuard>} />

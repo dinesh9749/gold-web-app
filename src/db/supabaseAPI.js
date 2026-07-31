@@ -756,27 +756,67 @@ export const supabaseAPI = {
   // --- INVOICES ---
   saveInvoice: async (data) => {
     const orgId = getActiveOrgId();
-    const { data: invoice, error: invErr } = await supabase
-      .from('invoices')
-      .insert([{
-        invoice_no: data.invoiceNo,
-        date: data.date,
-        customer_id: data.customerId || null,
-        customer_name: data.customerName,
-        subtotal: data.subtotal,
-        cgst_rate: data.cgstRate,
-        cgst_amount: data.cgstAmount,
-        sgst_rate: data.sgstRate,
-        sgst_amount: data.sgstAmount,
-        old_gold_weight: data.oldGoldWeight || 0,
-        old_gold_amount: data.oldGoldAmount || 0,
-        grand_total: data.grandTotal,
-        final_amount: data.finalAmount,
-        other_charges: data.otherCharges || 0,
-        product_photo: data.productPhoto || null,
-        org_id: orgId
-      }])
-      .select();
+
+    const insertSingleInvoice = async (invNo) => {
+      return await supabase
+        .from('invoices')
+        .insert([{
+          invoice_no: invNo,
+          date: data.date,
+          customer_id: data.customerId || null,
+          customer_name: data.customerName,
+          subtotal: data.subtotal,
+          cgst_rate: data.cgstRate,
+          cgst_amount: data.cgstAmount,
+          sgst_rate: data.sgstRate,
+          sgst_amount: data.sgstAmount,
+          old_gold_weight: data.oldGoldWeight || 0,
+          old_gold_amount: data.oldGoldAmount || 0,
+          grand_total: data.grandTotal,
+          final_amount: data.finalAmount,
+          other_charges: data.otherCharges || 0,
+          product_photo: data.productPhoto || null,
+          org_id: orgId
+        }])
+        .select();
+    };
+
+    let targetInvNo = data.invoiceNo || 'INV-1001';
+    let { data: invoice, error: invErr } = await insertSingleInvoice(targetInvNo);
+
+    // Auto-resolve duplicate invoice_no errors by scanning database for highest sequence number
+    if (invErr && (invErr.code === '23505' || String(invErr.message || '').toLowerCase().includes('duplicate') || String(invErr.message || '').toLowerCase().includes('unique'))) {
+      console.warn(`Duplicate invoice_no ${targetInvNo} detected. Auto-resolving next available sequence...`);
+      
+      const { data: allInvs } = await supabase
+        .from('invoices')
+        .select('invoice_no')
+        .eq('org_id', orgId);
+
+      const { data: allJobs } = await supabase
+        .from('soldering_engraving_jobs')
+        .select('invoice_number')
+        .eq('org_id', orgId);
+
+      let highest = 1000;
+      const scanNum = (str) => {
+        if (!str) return;
+        const m = String(str).match(/(\d+)/);
+        if (m) {
+          const n = parseInt(m[1], 10);
+          if (n > highest) highest = n;
+        }
+      };
+
+      (allInvs || []).forEach(i => scanNum(i.invoice_no));
+      (allJobs || []).forEach(j => scanNum(j.invoice_number));
+
+      targetInvNo = `INV-${highest + 1}`;
+      const retryResult = await insertSingleInvoice(targetInvNo);
+      invoice = retryResult.data;
+      invErr = retryResult.error;
+    }
+
     if (invErr) throw invErr;
     const invoiceRow = ensureRowReturned(invoice, 'invoices');
     const invoiceId = invoiceRow.id;
@@ -791,15 +831,23 @@ export const supabaseAPI = {
         stone_weight: item.stoneWeight || 0,
         making_charges: item.makingCharges || 0,
         rate_per_gram: item.ratePerGram,
-        amount: item.amount,
-        org_id: orgId
+        amount: item.amount
       }));
-      const { error: itemsErr } = await supabase
+      let { error: itemsErr } = await supabase
         .from('invoice_items')
         .insert(itemsToInsert);
-      if (itemsErr) throw itemsErr;
+
+      if (itemsErr) {
+        if (String(itemsErr.message || '').includes('org_id')) {
+          const itemsWithOrg = itemsToInsert.map(i => ({ ...i, org_id: orgId }));
+          const retryRes = await supabase.from('invoice_items').insert(itemsWithOrg);
+          if (retryRes.error) throw itemsErr;
+        } else {
+          throw itemsErr;
+        }
+      }
     }
-    return { id: invoiceId };
+    return { id: invoiceId, invoiceNo: targetInvNo };
   },
 
   getAllInvoices: async () => {
@@ -810,7 +858,7 @@ export const supabaseAPI = {
       .order('date', { ascending: false })
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return data.map(row => ({
+    return (data || []).map(row => ({
       id: row.id,
       invoiceNo: row.invoice_no,
       date: row.date,
@@ -896,21 +944,51 @@ export const supabaseAPI = {
 
   // --- SOLDERING & ENGRAVING ---
   saveSolderingJob: async (jobData) => {
-    const { data, error } = await supabase
+    const orgId = getActiveOrgId();
+    const invNo = jobData.invoiceNo || jobData.invoiceNumber || 'INV-1001';
+
+    const rowToInsert = {
+      date: jobData.date,
+      customer_name: jobData.customerName,
+      product: jobData.product,
+      marking_charges: jobData.markingCharges,
+      gst_amount: jobData.gstAmount,
+      total_amount: jobData.totalAmount,
+      invoice_number: invNo,
+      invoice_no: invNo,
+      org_id: orgId
+    };
+
+    let resData;
+    let { data, error } = await supabase
       .from('soldering_engraving_jobs')
-      .insert([{
-        date: jobData.date,
-        customer_name: jobData.customerName,
-        product: jobData.product,
-        marking_charges: jobData.markingCharges,
-        gst_amount: jobData.gstAmount,
-        total_amount: jobData.totalAmount,
-        org_id: getActiveOrgId()
-      }])
+      .insert([rowToInsert])
       .select();
-    if (error) throw error;
-    const row = ensureRowReturned(data, 'soldering_engraving_jobs');
-    return { id: row.id };
+
+    if (error) {
+      delete rowToInsert.invoice_no;
+      const retry1 = await supabase
+        .from('soldering_engraving_jobs')
+        .insert([rowToInsert])
+        .select();
+
+      if (retry1.error) {
+        delete rowToInsert.invoice_number;
+        const retry2 = await supabase
+          .from('soldering_engraving_jobs')
+          .insert([rowToInsert])
+          .select();
+        if (retry2.error) throw retry2.error;
+        resData = retry2.data;
+      } else {
+        resData = retry1.data;
+      }
+    } else {
+      resData = data;
+    }
+
+    const row = ensureRowReturned(resData, 'soldering_engraving_jobs');
+    return { id: row.id, invoiceNo: invNo };
   },
 
   getAllSolderingJobs: async () => {
@@ -921,16 +999,22 @@ export const supabaseAPI = {
       .order('date', { ascending: false })
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return data.map(row => ({
-      id: row.id,
-      date: row.date,
-      customerName: row.customer_name,
-      product: row.product,
-      markingCharges: parseFloat(row.marking_charges) || 0,
-      gstAmount: parseFloat(row.gst_amount) || 0,
-      totalAmount: parseFloat(row.total_amount) || 0,
-      createdAt: row.created_at
-    }));
+    return (data || []).map(row => {
+      const invNo = row.invoice_number || row.invoice_no || row.receipt_no || row.job_no || null;
+      return {
+        id: row.id,
+        date: row.date,
+        customerName: row.customer_name,
+        product: row.product,
+        markingCharges: parseFloat(row.marking_charges) || 0,
+        gstAmount: parseFloat(row.gst_amount) || 0,
+        totalAmount: parseFloat(row.total_amount) || 0,
+        invoiceNumber: invNo,
+        invoiceNo: invNo,
+        receiptNo: invNo,
+        createdAt: row.created_at
+      };
+    });
   },
 
   deleteSolderingJob: async (id) => {

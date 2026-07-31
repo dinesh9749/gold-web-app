@@ -1,14 +1,66 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Printer, Save, Trash, Eye, Sparkles } from 'lucide-react';
+import { supabaseAPI } from '../../db/supabaseAPI';
+
+const incrementInvoiceNo = (invNo) => {
+  if (!invNo) return 'INV-1001';
+  const match = String(invNo).match(/^(.*?)(\d+)$/);
+  if (!match) return String(invNo) + "-1";
+  const prefix = match[1];
+  const numberStr = match[2];
+  const nextNumber = parseInt(numberStr, 10) + 1;
+  const paddedNumber = String(nextNumber).padStart(numberStr.length, '0');
+  return prefix + paddedNumber;
+};
+
+const getNextInvoiceSequence = (settingNo, existingInvoices = [], existingSolderingJobs = []) => {
+  const defaultBase = settingNo || 'INV-1001';
+  let highestNum = -1;
+  let highestStr = defaultBase;
+
+  const checkItem = (invNumStr) => {
+    if (invNumStr) {
+      const match = String(invNumStr).match(/^(.*?)(\d+)$/);
+      if (match) {
+        const num = parseInt(match[2], 10);
+        if (num > highestNum) {
+          highestNum = num;
+          highestStr = String(invNumStr);
+        }
+      }
+    }
+  };
+
+  (Array.isArray(existingInvoices) ? existingInvoices : []).forEach(inv => {
+    if (inv) checkItem(inv.invoiceNumber || inv.invoiceNo || inv.invoice_no);
+  });
+  (Array.isArray(existingSolderingJobs) ? existingSolderingJobs : []).forEach(job => {
+    if (job) checkItem(job.invoiceNumber || job.invoiceNo || job.invoice_number || job.receiptNo);
+  });
+
+  if (highestNum === -1) return defaultBase;
+
+  const nextFromDb = incrementInvoiceNo(highestStr);
+  const matchSetting = String(defaultBase).match(/^(.*?)(\d+)$/);
+  if (matchSetting) {
+    const settingNum = parseInt(matchSetting[2], 10);
+    if (settingNum > highestNum + 1) {
+      return defaultBase;
+    }
+  }
+
+  return nextFromDb;
+};
 
 export default function MsSolderingEngraving() {
   const outletContext = useOutletContext();
   const isAdmin = true;
-  
+
   const [activeTab, setActiveTab] = useState("generator"); // "generator" or "history"
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [invoices, setInvoices] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showPreview, setShowPreview] = useState(false);
@@ -16,6 +68,7 @@ export default function MsSolderingEngraving() {
 
   // Form states
   const [formData, setFormData] = useState({
+    invoiceNo: "",
     date: new Date().toISOString().split("T")[0],
     customerName: "",
     product: "",
@@ -28,24 +81,100 @@ export default function MsSolderingEngraving() {
   const totalVal = Math.round((chargesVal + gstVal) * 100) / 100;
 
   useEffect(() => {
-    if (activeTab === "history") {
-      loadJobs();
-    }
+    loadJobsAndSequence();
   }, [activeTab]);
 
-  const loadJobs = async () => {
+  const loadJobsAndSequence = async () => {
     try {
       setLoading(true);
-      const res = await window.electronAPI?.getAllSolderingJobs();
-      if (res) {
-        setJobs(res);
-      }
+      const api = window.electronAPI || supabaseAPI;
+      const [settingsRes, invRes, soldRes] = await Promise.all([
+        api?.getOrganizationSettings ? api.getOrganizationSettings() : Promise.resolve(null),
+        api?.getAllInvoices ? api.getAllInvoices() : Promise.resolve([]),
+        api?.getAllSolderingJobs ? api.getAllSolderingJobs() : Promise.resolve([])
+      ]);
+
+      const validInvoices = Array.isArray(invRes) ? invRes : [];
+      const validJobs = Array.isArray(soldRes) ? soldRes : [];
+      setInvoices(validInvoices);
+      setJobs(validJobs);
+
+      const settingNo = settingsRes?.next_invoice_number || 'INV-1001';
+      const nextSeqNo = getNextInvoiceSequence(
+        settingNo, 
+        validInvoices, 
+        validJobs
+      );
+      setFormData(prev => ({
+        ...prev,
+        invoiceNo: nextSeqNo
+      }));
     } catch (err) {
-      console.error("Error loading soldering jobs:", err);
+      console.error("Error loading soldering jobs & sequence:", err);
     } finally {
       setLoading(false);
     }
   };
+
+  // Unified Invoice Number Resolver to align Soldering jobs with Retail Invoices
+  const resolvedJobInvoiceNos = useMemo(() => {
+    const map = {};
+    try {
+      const combinedRaw = [];
+
+      (Array.isArray(invoices) ? invoices : []).forEach(inv => {
+        if (!inv) return;
+        const rawDate = inv.createdAt || inv.created_at || inv.date || '';
+        const t = new Date(rawDate).getTime();
+        combinedRaw.push({
+          id: inv.id,
+          rawNo: inv.invoiceNo || inv.invoiceNumber || null,
+          time: isNaN(t) ? 0 : t
+        });
+      });
+
+      (Array.isArray(jobs) ? jobs : []).forEach(job => {
+        if (!job) return;
+        const rawDate = job.createdAt || job.created_at || job.date || '';
+        const t = new Date(rawDate).getTime();
+        combinedRaw.push({
+          id: job.id,
+          rawNo: job.invoiceNo || job.invoiceNumber || job.receiptNo || null,
+          time: isNaN(t) ? 0 : t,
+          isSoldering: true
+        });
+      });
+
+      combinedRaw.sort((a, b) => (a.time || 0) - (b.time || 0));
+
+      const usedInvoiceNos = new Set();
+      let currentSeqNum = 1001;
+
+      combinedRaw.forEach(item => {
+        let finalNo = item.rawNo != null ? String(item.rawNo).trim() : '';
+        if (!finalNo || finalNo.startsWith('#') || finalNo.length > 20 || usedInvoiceNos.has(finalNo)) {
+          while (usedInvoiceNos.has(`INV-${currentSeqNum}`)) {
+            currentSeqNum++;
+          }
+          finalNo = `INV-${currentSeqNum}`;
+          currentSeqNum++;
+        } else {
+          const match = finalNo.match(/(\d+)/);
+          if (match) {
+            const n = parseInt(match[1], 10);
+            if (n >= currentSeqNum) currentSeqNum = n + 1;
+          }
+        }
+        usedInvoiceNos.add(finalNo);
+        if (item.id) {
+          map[item.id] = finalNo;
+        }
+      });
+    } catch (err) {
+      console.error("Error resolving job invoice numbers:", err);
+    }
+    return map;
+  }, [invoices, jobs]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -67,8 +196,11 @@ export default function MsSolderingEngraving() {
 
     try {
       setSubmitting(true);
-      
+      const invoiceNo = formData.invoiceNo || 'INV-1001';
+
       const payload = {
+        invoiceNo: invoiceNo,
+        invoiceNumber: invoiceNo,
         date: formData.date,
         customerName: formData.customerName.trim(),
         product: formData.product.trim(),
@@ -77,32 +209,49 @@ export default function MsSolderingEngraving() {
         totalAmount: totalVal
       };
 
-      const result = await window.electronAPI?.saveSolderingJob(payload);
+      const api = window.electronAPI || supabaseAPI;
+      const result = api?.saveSolderingJob ? await api.saveSolderingJob(payload) : null;
       if (result?.id) {
-        alert("Soldering & Engraving job saved successfully!");
-        
-        // Show receipt print preview with the saved record (generate a pseudo-receipt number using first few chars of ID)
-        const displayId = result.id.substring(0, 8).toUpperCase();
+        const savedInvoiceNo = result.invoiceNo || invoiceNo;
+        const nextNo = incrementInvoiceNo(savedInvoiceNo);
+        if (api?.updateOrganizationSettings) {
+          await api.updateOrganizationSettings(nextNo);
+        }
+
+        alert(`Soldering & Engraving Invoice (${savedInvoiceNo}) saved successfully!`);
+
         setPreviewJob({
-          receiptNo: `SE-${new Date(formData.date).getFullYear()}-${displayId}`,
+          receiptNo: savedInvoiceNo,
+          invoiceNo: savedInvoiceNo,
           ...payload
         });
-        
-        // Reset form
+
+        const [freshInvoices, freshJobs] = await Promise.all([
+          api?.getAllInvoices ? api.getAllInvoices() : Promise.resolve([]),
+          api?.getAllSolderingJobs ? api.getAllSolderingJobs() : Promise.resolve([])
+        ]);
+
+        const validInvoices = Array.isArray(freshInvoices) ? freshInvoices : [];
+        const validJobs = Array.isArray(freshJobs) ? freshJobs : jobs;
+
+        setInvoices(validInvoices);
+        setJobs(validJobs);
+
+        const nextSeqNo = getNextInvoiceSequence(nextNo, validInvoices, validJobs);
+
         setFormData({
+          invoiceNo: nextSeqNo,
           date: new Date().toISOString().split("T")[0],
           customerName: "",
           product: "",
           markingCharges: ""
         });
-        
+
         setShowPreview(true);
-      } else {
-        alert("Failed to save. Please make sure database is connected.");
       }
-    } catch (err) {
-      console.error("Error saving job:", err);
-      alert("Failed to save order.");
+    } catch (error) {
+      console.error("Error saving job:", error);
+      alert(`Failed to save soldering job: ${error?.message || "Please try again."}`);
     } finally {
       setSubmitting(false);
     }
@@ -115,8 +264,11 @@ export default function MsSolderingEngraving() {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this job record permanently?")) {
       try {
-        await window.electronAPI?.deleteSolderingJob(id);
-        setJobs(prev => prev.filter(job => job.id !== id));
+        const api = window.electronAPI || supabaseAPI;
+        if (api?.deleteSolderingJob) {
+          await api.deleteSolderingJob(id);
+        }
+        setJobs(prev => (Array.isArray(prev) ? prev.filter(job => job.id !== id) : []));
       } catch (err) {
         console.error("Error deleting job:", err);
         alert("Failed to delete record.");
@@ -125,25 +277,33 @@ export default function MsSolderingEngraving() {
   };
 
   const handleViewReceipt = (job) => {
-    const displayId = job.id.substring(0, 8).toUpperCase();
+    if (!job) return;
+    const resolvedNo = (resolvedJobInvoiceNos && job.id) ? resolvedJobInvoiceNos[job.id] : null;
+    const invNo = resolvedNo || job.invoiceNo || job.invoiceNumber || 'INV-1001';
+    const marking = parseFloat(job.markingCharges ?? job.marking_charges ?? job.charge ?? job.amount ?? 0);
+    const gst = parseFloat(job.gstAmount ?? job.gst_amount ?? (marking * 0.05) ?? 0);
+    const total = parseFloat(job.totalAmount ?? job.total_amount ?? (marking + gst) ?? 0);
     setPreviewJob({
-      receiptNo: `SE-${new Date(job.date).getFullYear()}-${displayId}`,
-      date: job.date,
-      customerName: job.customerName,
-      product: job.product,
-      markingCharges: job.markingCharges,
-      gstAmount: job.gstAmount,
-      totalAmount: job.totalAmount
+      receiptNo: invNo,
+      invoiceNo: invNo,
+      date: job.date || new Date().toISOString().split("T")[0],
+      customerName: job.customerName || job.customer_name || '',
+      product: job.product || job.ornament || '',
+      markingCharges: marking,
+      gstAmount: gst,
+      totalAmount: total
     });
     setShowPreview(true);
   };
 
-  const filteredJobs = jobs.filter(job => {
-    const query = searchQuery.toLowerCase();
-    return (
-      job.customerName.toLowerCase().includes(query) ||
-      job.product.toLowerCase().includes(query)
-    );
+  const filteredJobs = (Array.isArray(jobs) ? jobs : []).filter(job => {
+    if (!job) return false;
+    const query = (searchQuery || '').toLowerCase().trim();
+    const cName = String(job.customerName || job.customer_name || '').toLowerCase();
+    const prod = String(job.product || job.ornament || '').toLowerCase();
+    const resolvedNo = (resolvedJobInvoiceNos && job.id) ? resolvedJobInvoiceNos[job.id] : null;
+    const invNo = String(resolvedNo || job.invoiceNo || job.invoiceNumber || '').toLowerCase();
+    return cName.includes(query) || prod.includes(query) || invNo.includes(query);
   });
 
   return (
@@ -188,7 +348,19 @@ export default function MsSolderingEngraving() {
           </div>
 
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+              <div>
+                <label className="form-label">Invoice No *</label>
+                <input
+                  type="text"
+                  name="invoiceNo"
+                  value={formData.invoiceNo || ''}
+                  onChange={handleInputChange}
+                  className="form-input"
+                  style={{ fontWeight: 700, color: 'var(--gold-300)' }}
+                  required
+                />
+              </div>
               <div>
                 <label className="form-label">Job Date *</label>
                 <input
@@ -208,7 +380,7 @@ export default function MsSolderingEngraving() {
                   value={formData.customerName}
                   onChange={handleInputChange}
                   className="form-input"
-                  placeholder="Enter customer name manually..."
+                  placeholder="Customer name..."
                   required
                 />
               </div>
@@ -339,6 +511,7 @@ export default function MsSolderingEngraving() {
               <table className="data-table">
                 <thead>
                   <tr>
+                    <th>Invoice No</th>
                     <th>Date</th>
                     <th>Customer Name</th>
                     <th>Product / Job</th>
@@ -349,40 +522,48 @@ export default function MsSolderingEngraving() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredJobs.map(job => (
-                    <tr key={job.id}>
-                      <td>{job.date}</td>
-                      <td><strong>{job.customerName}</strong></td>
-                      <td>{job.product}</td>
-                      <td>₹{job.markingCharges.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td>₹{job.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                      <td>
-                        <strong style={{ color: '#4ade80' }}>
-                          ₹{job.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </strong>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button
-                            className="btn-secondary"
-                            style={{ padding: '5px 10px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
-                            onClick={() => handleViewReceipt(job)}
-                          >
-                            <Eye size={12} /> View/Print
-                          </button>
-                          {isAdmin && (
+                  {filteredJobs.map((job, idx) => {
+                    const marking = parseFloat(job.markingCharges ?? job.marking_charges ?? job.charge ?? job.amount ?? 0);
+                    const gst = parseFloat(job.gstAmount ?? job.gst_amount ?? (marking * 0.05) ?? 0);
+                    const total = parseFloat(job.totalAmount ?? job.total_amount ?? (marking + gst) ?? 0);
+                    
+                    const invNo = resolvedJobInvoiceNos[job.id] || job.invoiceNo || job.invoiceNumber || `INV-${1001 + (filteredJobs.length - 1 - idx)}`;
+                    return (
+                      <tr key={job.id}>
+                        <td style={{ fontWeight: 700, color: 'var(--gold-200)' }}>{invNo}</td>
+                        <td>{job.date}</td>
+                        <td><strong>{job.customerName || job.customer_name || '—'}</strong></td>
+                        <td>{job.product || job.ornament || '—'}</td>
+                        <td>₹{marking.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td>₹{gst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td>
+                          <strong style={{ color: '#4ade80' }}>
+                            ₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </strong>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
                             <button
-                              className="btn-danger"
+                              className="btn-secondary"
                               style={{ padding: '5px 10px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
-                              onClick={() => handleDelete(job.id)}
+                              onClick={() => handleViewReceipt({ ...job, invoiceNo: invNo, receiptNo: invNo })}
                             >
-                              <Trash size={12} /> Delete
+                              <Eye size={12} /> View/Print
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            {isAdmin && (
+                              <button
+                                className="btn-danger"
+                                style={{ padding: '5px 10px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
+                                onClick={() => handleDelete(job.id)}
+                              >
+                                <Trash size={12} /> Delete
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -401,15 +582,15 @@ export default function MsSolderingEngraving() {
                 <button
                   onClick={handlePrint}
                   className="btn-primary"
-                  style={{ padding: '5px 12px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
+                  style={{ padding: '6px 14px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}
                 >
                   <Printer size={13} /> Print
                 </button>
                 <button
                   onClick={() => setShowPreview(false)}
-                  className="modal-close"
-                  style={{ width: 26, height: 26, fontSize: 12 }}
-                >✕</button>
+                  className="btn-secondary"
+                  style={{ padding: '6px 12px', fontSize: 11 }}
+                >Close</button>
               </div>
             </div>
 
@@ -445,7 +626,7 @@ export default function MsSolderingEngraving() {
                 </div>
 
                 <div style={{ fontSize: 10, display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 10 }}>
-                  <div><strong>Rcpt No:</strong> {previewJob.receiptNo}</div>
+                  <div><strong>Invoice No:</strong> {previewJob.invoiceNo || previewJob.receiptNo}</div>
                   <div><strong>Date:</strong> {previewJob.date}</div>
                   <div><strong>Customer:</strong> {previewJob.customerName}</div>
                 </div>
@@ -485,7 +666,7 @@ export default function MsSolderingEngraving() {
 
                 <div style={{ textAlign: 'center', fontSize: 9 }}>
                   <p style={{ margin: '1px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
-                  <p style={{ margin: '1px 0', color: '#334155' }}>DK Nova Technologies ERP</p>
+
                 </div>
               </div>
             </div>
@@ -506,7 +687,7 @@ export default function MsSolderingEngraving() {
           </div>
 
           <div style={{ fontSize: 10, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 2, fontWeight: 'bold' }}>
-            <div><strong>Receipt No:</strong> {previewJob.receiptNo}</div>
+            <div><strong>Invoice No:</strong> {previewJob.invoiceNo || previewJob.receiptNo}</div>
             <div><strong>Date:</strong> {previewJob.date}</div>
             <div><strong>Customer:</strong> {previewJob.customerName}</div>
           </div>
@@ -546,7 +727,7 @@ export default function MsSolderingEngraving() {
 
           <div style={{ textAlign: 'center', fontSize: 9, fontWeight: 'bold' }}>
             <p style={{ margin: '1px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
-            <p style={{ margin: '1px 0', color: '#000', fontWeight: 'bold' }}>DK Nova Technologies ERP</p>
+
           </div>
         </div>
       )}

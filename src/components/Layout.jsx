@@ -74,13 +74,6 @@ const icons = {
       <line x1="22" y1="11" x2="16" y2="11" />
     </svg>
   ),
-  poster: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-      <circle cx="8.5" cy="8.5" r="1.5" />
-      <polyline points="21 15 16 10 5 21" />
-    </svg>
-  ),
   stock: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
@@ -115,7 +108,6 @@ const erpNavItemsMap = {
     { to: '/MsSolderingEngraving', label: 'M.S. Soldering & Engraving', icon: 'soldering', section: 'mgmt' },
     { to: '/attendance', label: 'Attendance', icon: 'attendance', section: 'mgmt' },
     { to: '/employee-setup', label: 'Employee Setup', icon: 'empsetup', section: 'mgmt' },
-    { to: '/poster-create', label: 'Poster Creator', icon: 'poster', section: 'mgmt' },
     { to: '/stock', label: 'Stock Inventory', icon: 'stock', section: 'mgmt' },
     { to: '/settings', label: 'Settings', icon: 'settings', section: 'mgmt' },
   ],
@@ -150,7 +142,6 @@ const pageTitles = {
   msdigigold: 'DigiGold',
   mssolderingengraving: 'M.S. Soldering & Engraving',
   settings: 'Settings',
-  'poster-create': 'Poster Creator',
   stock: 'Stock Inventory',
   attendance: 'Attendance',
   'employee-setup': 'Employee Setup',
@@ -236,7 +227,6 @@ function Layout() {
       mssolderingengraving: 'soldering_enabled',
       attendance: 'attendance_enabled',
       'employee-setup': 'empsetup_enabled',
-      'poster-create': 'poster_enabled',
       stock: 'stock_enabled',
       settings: 'settings_enabled',
     };

@@ -19,7 +19,6 @@ const INITIAL_FEATURES = {
   soldering_enabled: true,
   attendance_enabled: true,
   empsetup_enabled: true,
-  poster_enabled: true,
   settings_enabled: true,
   stock_enabled: true,
 
@@ -49,7 +48,6 @@ const FEATURE_CATEGORIES = [
       { key: 'soldering_enabled', label: 'M.S. Soldering & Engraving' },
       { key: 'attendance_enabled', label: 'Attendance Management' },
       { key: 'empsetup_enabled', label: 'Employee Setup' },
-      { key: 'poster_enabled', label: 'Poster Creator' },
       { key: 'stock_enabled', label: 'Gold Stock Inventory' },
       { key: 'settings_enabled', label: 'Settings' },
     ]
@@ -83,7 +81,6 @@ const FEATURE_LABELS = {
   soldering_enabled: 'M.S. Soldering',
   attendance_enabled: 'Attendance',
   empsetup_enabled: 'Employee Setup',
-  poster_enabled: 'Poster Creator',
   settings_enabled: 'Settings',
   stock_enabled: 'Stock Inventory',
   silver_retail_dashboard_enabled: 'Silver Retail Dashboard',

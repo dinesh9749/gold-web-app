@@ -21,6 +21,22 @@ export default function GoldReports() {
   const [customEndDate, setCustomEndDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Helper date formatter
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    try {
+      if (typeof dateStr === 'string') {
+        const clean = dateStr.split('T')[0];
+        if (clean && clean.length === 10) return clean;
+      }
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().split('T')[0];
+      }
+    } catch (e) {}
+    return String(dateStr);
+  };
+
   // Helper date calculators
   const getFilterDates = useCallback(() => {
     const now = new Date();
@@ -118,7 +134,7 @@ export default function GoldReports() {
 
   const filteredSalesOrders = useMemo(() => {
     return salesOrders.filter(so => {
-      const matchDate = isDateInRange(so.createdAt || so.created_at || so.deliveryDate);
+      const matchDate = isDateInRange(so.createdAt || so.created_at || so.orderDate || so.date || so.deliveryDate);
       const matchQuery = !searchQuery.trim() || 
         (so.customerName || '').toLowerCase().includes(searchQuery.toLowerCase());
       return matchDate && matchQuery;
@@ -127,12 +143,13 @@ export default function GoldReports() {
 
   const filteredStockItems = useMemo(() => {
     return stockItems.filter(item => {
+      const matchDate = isDateInRange(item.createdAt || item.created_at || item.entryDate || item.date);
       const matchQuery = !searchQuery.trim() || 
         (item.itemName || item.item_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (item.purity || '').toLowerCase().includes(searchQuery.toLowerCase());
-      return matchQuery;
+      return matchDate && matchQuery;
     });
-  }, [stockItems, searchQuery]);
+  }, [stockItems, isDateInRange, searchQuery]);
 
   const filteredSolderingJobs = useMemo(() => {
     return solderingJobs.filter(job => {
@@ -146,12 +163,13 @@ export default function GoldReports() {
 
   const filteredDigiGold = useMemo(() => {
     return digiGoldSchemes.filter(sch => {
+      const matchDate = isDateInRange(sch.createdAt || sch.created_at || sch.startDate || sch.date);
       const matchQuery = !searchQuery.trim() || 
         (sch.customerName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (sch.schemeName || '').toLowerCase().includes(searchQuery.toLowerCase());
-      return matchQuery;
+      return matchDate && matchQuery;
     });
-  }, [digiGoldSchemes, searchQuery]);
+  }, [digiGoldSchemes, isDateInRange, searchQuery]);
 
   // Aggregated Summary Statistics
   const summaryStats = useMemo(() => {
@@ -212,7 +230,7 @@ export default function GoldReports() {
     let totalSolderingJobs = filteredSolderingJobs.length;
     let totalSolderingRevenue = 0;
     filteredSolderingJobs.forEach(job => {
-      totalSolderingRevenue += parseFloat(job.charge || job.amount || job.cost || 0);
+      totalSolderingRevenue += parseFloat(job.totalAmount ?? job.total_amount ?? job.markingCharges ?? job.marking_charges ?? job.charge ?? job.amount ?? job.cost ?? 0);
     });
 
     return {
@@ -234,6 +252,181 @@ export default function GoldReports() {
       totalSolderingRevenue,
     };
   }, [filteredInvoices, filteredReceipts, filteredSalesOrders, filteredStockItems, filteredDigiGold, filteredSolderingJobs]);
+
+  // Unified Combined GST Filing Ledger (Invoices + Soldering Jobs sorted by Invoice Number)
+  const combinedGstLedger = useMemo(() => {
+    const combinedRaw = [];
+
+    // Collect all invoices
+    (filteredInvoices || []).forEach((inv, idx) => {
+      const grandTotal = parseFloat(inv.grandTotal || inv.finalAmount || inv.totalAmount || 0);
+      const taxAmount = parseFloat(inv.taxAmount || inv.gstAmount || 0);
+      const subtotal = parseFloat(inv.subtotal || inv.taxableAmount || (grandTotal - taxAmount));
+      const cgst = parseFloat(inv.cgstAmount || (taxAmount / 2));
+      const sgst = parseFloat(inv.sgstAmount || (taxAmount / 2));
+      const rawDate = inv.createdAt || inv.created_at || inv.date || '';
+
+      combinedRaw.push({
+        id: inv.id || `inv-${idx}`,
+        source: 'Invoice',
+        typeLabel: 'Gold Retail Sale',
+        rawInvoiceNo: inv.invoiceNo || inv.invoiceNumber || null,
+        date: formatDate(inv.createdAt || inv.created_at || inv.date),
+        rawTime: new Date(rawDate).getTime() || 0,
+        customerName: inv.customerName || 'Walk-in Customer',
+        hsnSac: '7113',
+        taxableAmount: subtotal,
+        gstRateLabel: '3% (1.5% CGST + 1.5% SGST)',
+        cgstAmount: cgst,
+        sgstAmount: sgst,
+        totalGstAmount: taxAmount,
+        grandTotal: grandTotal,
+        paymentMode: inv.paymentMode || inv.paymentType || 'Cash'
+      });
+    });
+
+    // Collect all soldering jobs
+    (filteredSolderingJobs || []).forEach((job, idx) => {
+      const marking = parseFloat(job.markingCharges ?? job.marking_charges ?? job.charge ?? job.amount ?? 0);
+      const gst = parseFloat(job.gstAmount ?? job.gst_amount ?? (marking * 0.05) ?? 0);
+      const total = parseFloat(job.totalAmount ?? job.total_amount ?? (marking + gst) ?? 0);
+      const rawDate = job.createdAt || job.created_at || job.date || '';
+
+      combinedRaw.push({
+        id: job.id || `job-${idx}`,
+        source: 'Soldering',
+        typeLabel: 'Soldering & Engraving',
+        rawInvoiceNo: job.invoiceNo || job.invoiceNumber || job.receiptNo || null,
+        date: formatDate(job.createdAt || job.created_at || job.date),
+        rawTime: new Date(rawDate).getTime() || 0,
+        customerName: job.customerName || job.customer_name || '—',
+        hsnSac: '9988 / 9983',
+        taxableAmount: marking,
+        gstRateLabel: '5% (2.5% CGST + 2.5% SGST)',
+        cgstAmount: gst / 2,
+        sgstAmount: gst / 2,
+        totalGstAmount: gst,
+        grandTotal: total,
+        paymentMode: 'Service / Cash'
+      });
+    });
+
+    // Sort chronologically by creation timestamp (oldest first)
+    combinedRaw.sort((a, b) => (a.rawTime || 0) - (b.rawTime || 0));
+
+    // Assign continuous non-colliding invoice numbers
+    const usedInvoiceNos = new Set();
+    let currentSeqNum = 1001;
+
+    const list = combinedRaw.map(item => {
+      let finalNo = item.rawInvoiceNo != null ? String(item.rawInvoiceNo).trim() : '';
+      
+      // If missing or duplicate or raw UUID prefix (#...), assign next continuous sequence number
+      if (!finalNo || finalNo.startsWith('#') || finalNo.length > 20 || usedInvoiceNos.has(finalNo)) {
+        while (usedInvoiceNos.has(`INV-${currentSeqNum}`)) {
+          currentSeqNum++;
+        }
+        finalNo = `INV-${currentSeqNum}`;
+        currentSeqNum++;
+      } else {
+        const match = finalNo.match(/(\d+)/);
+        if (match) {
+          const n = parseInt(match[1], 10);
+          if (n >= currentSeqNum) currentSeqNum = n + 1;
+        }
+      }
+      usedInvoiceNos.add(finalNo);
+
+      return {
+        ...item,
+        invoiceNo: finalNo
+      };
+    });
+
+    // Sort ledger continuously by Invoice Number for display
+    list.sort((a, b) => {
+      const matchA = String(a.invoiceNo).match(/(\d+)/);
+      const matchB = String(b.invoiceNo).match(/(\d+)/);
+      if (matchA && matchB) {
+        const numA = parseInt(matchA[1], 10);
+        const numB = parseInt(matchB[1], 10);
+        if (numA !== numB) return numA - numB;
+      }
+      return String(a.invoiceNo).localeCompare(String(b.invoiceNo));
+    });
+
+    return list;
+  }, [filteredInvoices, filteredSolderingJobs]);
+
+  const gstStats = useMemo(() => {
+    let totalTaxable = 0;
+    let totalCgst = 0;
+    let totalSgst = 0;
+    let totalGst = 0;
+    let totalGrand = 0;
+
+    combinedGstLedger.forEach(item => {
+      totalTaxable += item.taxableAmount;
+      totalCgst += item.cgstAmount;
+      totalSgst += item.sgstAmount;
+      totalGst += item.totalGstAmount;
+      totalGrand += item.grandTotal;
+    });
+
+    return {
+      count: combinedGstLedger.length,
+      totalTaxable,
+      totalCgst,
+      totalSgst,
+      totalGst,
+      totalGrand
+    };
+  }, [combinedGstLedger]);
+
+  const handleExportGSTReportCSV = () => {
+    let csvRows = [];
+    csvRows.push(['DK Nova Technologies - Combined GST Filing Report (GSTR-1 Format)']);
+    csvRows.push([`Generated On: ${new Date().toLocaleString()}`]);
+    csvRows.push([`Filter Range: ${dateRangeOption.toUpperCase()}`]);
+    csvRows.push([]);
+
+    csvRows.push(['--- GST SUMMARY TOTALS ---']);
+    csvRows.push(['Total Tax Invoices Count', gstStats.count]);
+    csvRows.push(['Total Taxable Value', `₹${gstStats.totalTaxable.toFixed(2)}`]);
+    csvRows.push(['Total CGST Collected', `₹${gstStats.totalCgst.toFixed(2)}`]);
+    csvRows.push(['Total SGST Collected', `₹${gstStats.totalSgst.toFixed(2)}`]);
+    csvRows.push(['Total GST Liability', `₹${gstStats.totalGst.toFixed(2)}`]);
+    csvRows.push(['Total Invoiced Amount', `₹${gstStats.totalGrand.toFixed(2)}`]);
+    csvRows.push([]);
+
+    csvRows.push(['--- DETAILED GST TAX INVOICE LEDGER (ORDERED BY INVOICE NO) ---']);
+    csvRows.push(['Invoice No', 'Date', 'Type', 'HSN/SAC', 'Customer Name', 'Taxable Value (₹)', 'GST Rate', 'CGST (₹)', 'SGST (₹)', 'Total Tax (₹)', 'Invoice Total (₹)']);
+    
+    combinedGstLedger.forEach(item => {
+      csvRows.push([
+        item.invoiceNo,
+        item.date,
+        `"${item.typeLabel}"`,
+        item.hsnSac,
+        `"${item.customerName}"`,
+        `₹${item.taxableAmount.toFixed(2)}`,
+        `"${item.gstRateLabel}"`,
+        `₹${item.cgstAmount.toFixed(2)}`,
+        `₹${item.sgstAmount.toFixed(2)}`,
+        `₹${item.totalGstAmount.toFixed(2)}`,
+        `₹${item.grandTotal.toFixed(2)}`
+      ]);
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Combined_GST_Filing_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Export CSV Handler
   const handleExportCSV = () => {
@@ -261,11 +454,88 @@ export default function GoldReports() {
     filteredInvoices.forEach(inv => {
       csvRows.push([
         inv.invoiceNumber || inv.invoiceNo || '—',
-        inv.createdAt?.split('T')[0] || inv.date || '—',
+        formatDate(inv.createdAt || inv.created_at || inv.date),
         `"${inv.customerName || 'Walk-in'}"`,
         inv.paymentMode || inv.paymentType || 'Cash',
         `₹${parseFloat(inv.taxAmount || 0).toFixed(2)}`,
         `₹${parseFloat(inv.grandTotal || inv.finalAmount || 0).toFixed(2)}`
+      ]);
+    });
+    csvRows.push([]);
+
+    // Receipts Section
+    csvRows.push(['--- RECEIPTS REPORT ---']);
+    csvRows.push(['Receipt No', 'Date', 'Customer Name', 'Payment Mode', 'Total Paid']);
+    filteredReceipts.forEach(rec => {
+      csvRows.push([
+        rec.receiptNumber || rec.receiptNo || '—',
+        formatDate(rec.createdAt || rec.created_at || rec.date),
+        `"${rec.customerName || '—'}"`,
+        rec.paymentMode || 'Cash',
+        `₹${parseFloat(rec.totalPaid || rec.amount || 0).toFixed(2)}`
+      ]);
+    });
+    csvRows.push([]);
+
+    // Sales Orders Section
+    csvRows.push(['--- SALES ORDERS REPORT ---']);
+    csvRows.push(['Order No', 'Order Date', 'Customer Name', 'Delivery Date', 'Status', 'Advance Paid']);
+    filteredSalesOrders.forEach(so => {
+      csvRows.push([
+        so.orderNumber || so.orderNo || (so.id ? `#${so.id.slice(0, 6)}` : '—'),
+        formatDate(so.createdAt || so.created_at || so.orderDate || so.date),
+        `"${so.customerName || '—'}"`,
+        formatDate(so.deliveryDate),
+        (so.status || 'pending').toUpperCase(),
+        `₹${parseFloat(so.advanceAmount || 0).toFixed(2)}`
+      ]);
+    });
+    csvRows.push([]);
+
+    // Stock Inventory Section
+    csvRows.push(['--- STOCK INVENTORY REPORT ---']);
+    csvRows.push(['Barcode / ID', 'Entry Date', 'Item Name', 'Purity', 'Gross Weight (g)', 'Net Weight (g)']);
+    filteredStockItems.forEach(stk => {
+      csvRows.push([
+        stk.barcode || (stk.id ? `#${stk.id.slice(0, 6)}` : '—'),
+        formatDate(stk.createdAt || stk.created_at || stk.entryDate || stk.date),
+        `"${stk.itemName || stk.item_name || 'Gold Ornament'}"`,
+        stk.purity || '22K',
+        parseFloat(stk.grossWeight || stk.gross_weight || 0).toFixed(2),
+        parseFloat(stk.netWeight || stk.net_weight || 0).toFixed(2)
+      ]);
+    });
+    csvRows.push([]);
+
+    // DigiGold Section
+    csvRows.push(['--- DIGIGOLD SCHEMES REPORT ---']);
+    csvRows.push(['Scheme / Acc No', 'Created Date', 'Customer Name', 'Scheme Name', 'Accumulated Gold (g)']);
+    filteredDigiGold.forEach(sch => {
+      csvRows.push([
+        sch.accountNo || (sch.id ? `#${sch.id.slice(0, 6)}` : '—'),
+        formatDate(sch.createdAt || sch.created_at || sch.startDate || sch.date),
+        `"${sch.customerName || '—'}"`,
+        `"${sch.schemeName || 'Monthly Gold Saver'}"`,
+        parseFloat(sch.accumulatedGoldGrams || sch.total_gold_grams || 0).toFixed(3)
+      ]);
+    });
+    csvRows.push([]);
+
+    // Soldering Section
+    csvRows.push(['--- SOLDERING & REPAIR REPORT ---']);
+    csvRows.push(['Job ID', 'Date Received', 'Customer Name', 'Product / Job', 'Marking Charge', 'GST Amount', 'Total Charge']);
+    filteredSolderingJobs.forEach(job => {
+      const marking = parseFloat(job.markingCharges ?? job.marking_charges ?? job.charge ?? job.amount ?? 0);
+      const gst = parseFloat(job.gstAmount ?? job.gst_amount ?? (marking * 0.05) ?? 0);
+      const total = parseFloat(job.totalAmount ?? job.total_amount ?? (marking + gst) ?? 0);
+      csvRows.push([
+        job.id ? `#${job.id.slice(0, 6)}` : '—',
+        formatDate(job.createdAt || job.created_at || job.date),
+        `"${job.customerName || job.customer_name || '—'}"`,
+        `"${job.product || job.ornament || '—'}"`,
+        `₹${marking.toFixed(2)}`,
+        `₹${gst.toFixed(2)}`,
+        `₹${total.toFixed(2)}`
       ]);
     });
 
@@ -293,8 +563,11 @@ export default function GoldReports() {
             <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--gold-300)', display: 'flex', alignItems: 'center', gap: 10 }}>
               📈 Gold ERP Collective Reports & Analytics
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-              Comprehensive performance report for Invoices, Receipts, Orders, DigiGold, Stock & Repairs
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span>Comprehensive performance report for Invoices, Receipts, Orders, DigiGold, Stock & Repairs</span>
+              <span style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--gold-300)', padding: '2px 8px', borderRadius: 6, fontWeight: 700, border: '1px solid rgba(251,191,36,0.2)' }}>
+                🗓️ Date: {formatDate(new Date())}
+              </span>
             </div>
           </div>
 
@@ -449,7 +722,7 @@ export default function GoldReports() {
             <div className="card" style={{ padding: 18, borderLeft: '4px solid #fb923c' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Soldering & Service</div>
               <div style={{ fontSize: 22, fontWeight: 800, color: '#fb923c', margin: '6px 0 2px 0' }}>
-                ₹{summaryStats.totalSolderingRevenue.toLocaleString('en-IN')}
+                ₹{summaryStats.totalSolderingRevenue.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
                 {summaryStats.totalSolderingJobs} jobs processed
@@ -468,6 +741,7 @@ export default function GoldReports() {
           }}>
             {[
               { id: 'overview', label: '📊 Overview & Charts' },
+              { id: 'gst_filing', label: `🏛️ GST Filing Report (${combinedGstLedger.length})` },
               { id: 'invoices', label: `🧾 Invoices (${filteredInvoices.length})` },
               { id: 'receipts', label: `💳 Receipts (${filteredReceipts.length})` },
               { id: 'orders', label: `📦 Sales Orders (${filteredSalesOrders.length})` },
@@ -555,7 +829,7 @@ export default function GoldReports() {
                       {filteredInvoices.slice(0, 10).map((inv, idx) => (
                         <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                           <td style={{ padding: '10px 10px', fontWeight: 700, color: 'var(--gold-200)' }}>{inv.invoiceNumber || inv.invoiceNo || `INV-${idx+1}`}</td>
-                          <td style={{ padding: '10px 10px', color: 'var(--text-muted)' }}>{inv.createdAt?.split('T')[0] || inv.date || '—'}</td>
+                          <td style={{ padding: '10px 10px', color: 'var(--text-muted)' }}>{formatDate(inv.createdAt || inv.created_at || inv.date)}</td>
                           <td style={{ padding: '10px 10px', fontWeight: 600 }}>{inv.customerName || 'Walk-in Customer'}</td>
                           <td style={{ padding: '10px 10px' }}>
                             <span style={{ padding: '2px 8px', borderRadius: 4, background: 'rgba(251,191,36,0.1)', color: 'var(--gold-300)', fontSize: 10, fontWeight: 700 }}>
@@ -608,7 +882,7 @@ export default function GoldReports() {
                     {filteredInvoices.map((inv, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                         <td style={{ padding: '10px', fontWeight: 700, color: 'var(--gold-200)' }}>{inv.invoiceNumber || inv.invoiceNo || '—'}</td>
-                        <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{inv.createdAt?.split('T')[0] || inv.date || '—'}</td>
+                        <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{formatDate(inv.createdAt || inv.created_at || inv.date)}</td>
                         <td style={{ padding: '10px', fontWeight: 600 }}>{inv.customerName || 'Walk-in'}</td>
                         <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{inv.customerMobile || inv.mobile || '—'}</td>
                         <td style={{ padding: '10px' }}>{inv.paymentMode || inv.paymentType || 'Cash'}</td>
@@ -648,7 +922,7 @@ export default function GoldReports() {
                     {filteredReceipts.map((rec, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                         <td style={{ padding: '10px', fontWeight: 700, color: 'var(--gold-200)' }}>{rec.receiptNumber || rec.receiptNo || '—'}</td>
-                        <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{rec.createdAt?.split('T')[0] || rec.date || '—'}</td>
+                        <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{formatDate(rec.createdAt || rec.created_at || rec.date)}</td>
                         <td style={{ padding: '10px', fontWeight: 600 }}>{rec.customerName || '—'}</td>
                         <td style={{ padding: '10px' }}>{rec.paymentMode || 'Cash'}</td>
                         <td style={{ padding: '10px', textAlign: 'right', fontWeight: 800, color: '#4ade80' }}>
@@ -670,6 +944,8 @@ export default function GoldReports() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-default)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '10px' }}>Order No</th>
+                      <th style={{ padding: '10px' }}>Order Date</th>
                       <th style={{ padding: '10px' }}>Customer</th>
                       <th style={{ padding: '10px' }}>Delivery Date</th>
                       <th style={{ padding: '10px' }}>Status</th>
@@ -679,8 +955,10 @@ export default function GoldReports() {
                   <tbody>
                     {filteredSalesOrders.map((so, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                        <td style={{ padding: '10px', fontWeight: 700, color: 'var(--gold-200)' }}>{so.orderNumber || so.orderNo || (so.id ? `#${so.id.slice(0, 6)}` : `ORD-${idx+1}`)}</td>
+                        <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{formatDate(so.createdAt || so.created_at || so.orderDate || so.date)}</td>
                         <td style={{ padding: '10px', fontWeight: 600 }}>{so.customerName || '—'}</td>
-                        <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{so.deliveryDate || '—'}</td>
+                        <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{formatDate(so.deliveryDate)}</td>
                         <td style={{ padding: '10px' }}>
                           <span style={{
                             padding: '3px 8px', borderRadius: 12, fontSize: 10, fontWeight: 700,
@@ -712,6 +990,8 @@ export default function GoldReports() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-default)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '10px' }}>Barcode / ID</th>
+                      <th style={{ padding: '10px' }}>Entry Date</th>
                       <th style={{ padding: '10px' }}>Item Name</th>
                       <th style={{ padding: '10px' }}>Purity</th>
                       <th style={{ padding: '10px', textAlign: 'right' }}>Gross Wt (g)</th>
@@ -721,6 +1001,8 @@ export default function GoldReports() {
                   <tbody>
                     {filteredStockItems.map((stk, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                        <td style={{ padding: '10px', fontWeight: 700, color: 'var(--gold-200)' }}>{stk.barcode || (stk.id ? `#${stk.id.slice(0, 6)}` : `STK-${idx+1}`)}</td>
+                        <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{formatDate(stk.createdAt || stk.created_at || stk.entryDate || stk.date)}</td>
                         <td style={{ padding: '10px', fontWeight: 600 }}>{stk.itemName || stk.item_name || 'Gold Ornament'}</td>
                         <td style={{ padding: '10px', color: 'var(--gold-200)', fontWeight: 700 }}>{stk.purity || '22K'}</td>
                         <td style={{ padding: '10px', textAlign: 'right' }}>{parseFloat(stk.grossWeight || stk.gross_weight || 0).toFixed(2)}</td>
@@ -743,6 +1025,8 @@ export default function GoldReports() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-default)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '10px' }}>Scheme / Acc No</th>
+                      <th style={{ padding: '10px' }}>Created Date</th>
                       <th style={{ padding: '10px' }}>Customer Name</th>
                       <th style={{ padding: '10px' }}>Scheme</th>
                       <th style={{ padding: '10px', textAlign: 'right' }}>Accumulated Gold (g)</th>
@@ -751,6 +1035,8 @@ export default function GoldReports() {
                   <tbody>
                     {filteredDigiGold.map((sch, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                        <td style={{ padding: '10px', fontWeight: 700, color: 'var(--gold-200)' }}>{sch.accountNo || (sch.id ? `#${sch.id.slice(0, 6)}` : `SCH-${idx+1}`)}</td>
+                        <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{formatDate(sch.createdAt || sch.created_at || sch.startDate || sch.date)}</td>
                         <td style={{ padding: '10px', fontWeight: 600 }}>{sch.customerName || '—'}</td>
                         <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>{sch.schemeName || 'Monthly Gold Saver'}</td>
                         <td style={{ padding: '10px', textAlign: 'right', fontWeight: 800, color: '#f472b6' }}>
@@ -772,25 +1058,155 @@ export default function GoldReports() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border-default)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                      <th style={{ padding: '10px' }}>Job ID</th>
+                      <th style={{ padding: '10px' }}>Invoice No</th>
+                      <th style={{ padding: '10px' }}>Date Received</th>
                       <th style={{ padding: '10px' }}>Customer</th>
-                      <th style={{ padding: '10px' }}>Ornament</th>
-                      <th style={{ padding: '10px', textAlign: 'right' }}>Charge</th>
+                      <th style={{ padding: '10px' }}>Product / Job</th>
+                      <th style={{ padding: '10px', textAlign: 'right' }}>Marking Charge</th>
+                      <th style={{ padding: '10px', textAlign: 'right' }}>GST (5%)</th>
+                      <th style={{ padding: '10px', textAlign: 'right' }}>Total Charge</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredSolderingJobs.map((job, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                        <td style={{ padding: '10px', fontWeight: 700, color: 'var(--gold-200)' }}>{job.id ? `#${job.id.slice(0, 6)}` : `JOB-${idx+1}`}</td>
-                        <td style={{ padding: '10px', fontWeight: 600 }}>{job.customerName || '—'}</td>
-                        <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>{job.ornament || '—'}</td>
-                        <td style={{ padding: '10px', textAlign: 'right', fontWeight: 800, color: '#fb923c' }}>
-                          ₹{parseFloat(job.charge || job.amount || 0).toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredSolderingJobs.map((job, idx) => {
+                      const marking = parseFloat(job.markingCharges ?? job.marking_charges ?? job.charge ?? job.amount ?? 0);
+                      const gst = parseFloat(job.gstAmount ?? job.gst_amount ?? (marking * 0.05) ?? 0);
+                      const total = parseFloat(job.totalAmount ?? job.total_amount ?? (marking + gst) ?? 0);
+                      let invNo = job.invoiceNo || job.invoiceNumber || job.receiptNo;
+                      if (!invNo || invNo.startsWith('#') || invNo.length > 20) {
+                        invNo = `INV-${1001 + (filteredSolderingJobs.length - 1 - idx)}`;
+                      }
+                      return (
+                        <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                          <td style={{ padding: '10px', fontWeight: 700, color: 'var(--gold-200)' }}>{invNo}</td>
+                          <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{formatDate(job.createdAt || job.created_at || job.date)}</td>
+                          <td style={{ padding: '10px', fontWeight: 600 }}>{job.customerName || job.customer_name || '—'}</td>
+                          <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>{job.product || job.ornament || '—'}</td>
+                          <td style={{ padding: '10px', textAlign: 'right' }}>₹{marking.toFixed(2)}</td>
+                          <td style={{ padding: '10px', textAlign: 'right', color: 'var(--text-muted)' }}>₹{gst.toFixed(2)}</td>
+                          <td style={{ padding: '10px', textAlign: 'right', fontWeight: 800, color: '#fb923c' }}>
+                            ₹{total.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 8: COMBINED GST FILING REPORT */}
+          {activeTab === 'gst_filing' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              {/* GST Filing Summary Header Card */}
+              <div className="card" style={{ padding: 20, background: 'var(--bg-card)', border: '1px solid var(--border-default)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
+                  <div>
+                    <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0, color: 'var(--gold-300)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      🏛️ Combined GST Filing Report (Invoices & Soldering)
+                    </h3>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                      Unified sequential tax invoice ledger ordered continuously by Invoice Number for GSTR-1 & GST returns
+                    </div>
+                  </div>
+                  <button onClick={handleExportGSTReportCSV} className="btn-primary" style={{ padding: '8px 16px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                    📥 Export GSTR-1 CSV
+                  </button>
+                </div>
+
+                {/* GST KPI Statistics Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14 }}>
+                  <div style={{ padding: 12, borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                    <div style={{ fontSize: 10, color: 'var(--gold-300)', fontWeight: 700, textTransform: 'uppercase' }}>Tax Invoices Count</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--gold-300)', marginTop: 4 }}>
+                      {gstStats.count} Invoices
+                    </div>
+                  </div>
+                  <div style={{ padding: 12, borderRadius: 10, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.2)' }}>
+                    <div style={{ fontSize: 10, color: '#38bdf8', fontWeight: 700, textTransform: 'uppercase' }}>Total Taxable Turnover</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: '#38bdf8', marginTop: 4 }}>
+                      ₹{gstStats.totalTaxable.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div style={{ padding: 12, borderRadius: 10, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
+                    <div style={{ fontSize: 10, color: '#c084fc', fontWeight: 700, textTransform: 'uppercase' }}>CGST Collected</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: '#c084fc', marginTop: 4 }}>
+                      ₹{gstStats.totalCgst.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div style={{ padding: 12, borderRadius: 10, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.2)' }}>
+                    <div style={{ fontSize: 10, color: '#f472b6', fontWeight: 700, textTransform: 'uppercase' }}>SGST Collected</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: '#f472b6', marginTop: 4 }}>
+                      ₹{gstStats.totalSgst.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div style={{ padding: 12, borderRadius: 10, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                    <div style={{ fontSize: 10, color: '#4ade80', fontWeight: 700, textTransform: 'uppercase' }}>Total GST Liability</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: '#4ade80', marginTop: 4 }}>
+                      ₹{gstStats.totalGst.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sequential Invoice Table */}
+              <div className="card" style={{ padding: 20 }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-default)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                        <th style={{ padding: '10px' }}>Invoice No</th>
+                        <th style={{ padding: '10px' }}>Date</th>
+                        <th style={{ padding: '10px' }}>Document Type</th>
+                        <th style={{ padding: '10px' }}>HSN/SAC</th>
+                        <th style={{ padding: '10px' }}>Customer Name</th>
+                        <th style={{ padding: '10px', textAlign: 'right' }}>Taxable Value (₹)</th>
+                        <th style={{ padding: '10px', textAlign: 'center' }}>GST Rate</th>
+                        <th style={{ padding: '10px', textAlign: 'right' }}>CGST (₹)</th>
+                        <th style={{ padding: '10px', textAlign: 'right' }}>SGST (₹)</th>
+                        <th style={{ padding: '10px', textAlign: 'right' }}>Total GST (₹)</th>
+                        <th style={{ padding: '10px', textAlign: 'right' }}>Invoice Total (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {combinedGstLedger.map((item, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                          <td style={{ padding: '10px', fontWeight: 800, color: 'var(--gold-200)' }}>{item.invoiceNo}</td>
+                          <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{item.date}</td>
+                          <td style={{ padding: '10px' }}>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: 6,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              background: item.source === 'Invoice' ? 'rgba(56,189,248,0.1)' : 'rgba(251,146,60,0.1)',
+                              color: item.source === 'Invoice' ? '#38bdf8' : '#fb923c',
+                              border: `1px solid ${item.source === 'Invoice' ? 'rgba(56,189,248,0.2)' : 'rgba(251,146,60,0.2)'}`
+                            }}>
+                              {item.typeLabel}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item.hsnSac}</td>
+                          <td style={{ padding: '10px', fontWeight: 600 }}>{item.customerName}</td>
+                          <td style={{ padding: '10px', textAlign: 'right', fontWeight: 700 }}>₹{item.taxableAmount.toFixed(2)}</td>
+                          <td style={{ padding: '10px', textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>{item.gstRateLabel}</td>
+                          <td style={{ padding: '10px', textAlign: 'right' }}>₹{item.cgstAmount.toFixed(2)}</td>
+                          <td style={{ padding: '10px', textAlign: 'right' }}>₹{item.sgstAmount.toFixed(2)}</td>
+                          <td style={{ padding: '10px', textAlign: 'right', fontWeight: 700, color: '#f472b6' }}>₹{item.totalGstAmount.toFixed(2)}</td>
+                          <td style={{ padding: '10px', textAlign: 'right', fontWeight: 800, color: '#4ade80' }}>₹{item.grandTotal.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                      {combinedGstLedger.length === 0 && (
+                        <tr>
+                          <td colSpan="11" style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>
+                            No tax invoice records found in the selected date range.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}

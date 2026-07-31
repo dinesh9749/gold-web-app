@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Printer, Save, Trash, Eye, RefreshCw, X } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
+import { supabaseAPI } from "../../db/supabaseAPI";
+
 const incrementInvoiceNo = (invNo) => {
   if (!invNo) return 'INV-1001';
   const match = String(invNo).match(/^(.*?)(\d+)$/);
@@ -14,17 +16,13 @@ const incrementInvoiceNo = (invNo) => {
   return prefix + paddedNumber;
 };
 
-const getNextInvoiceSequence = (settingNo, existingInvoices) => {
+const getNextInvoiceSequence = (settingNo, existingInvoices = [], existingSolderingJobs = []) => {
   const defaultBase = settingNo || 'INV-1001';
-  if (!existingInvoices || existingInvoices.length === 0) {
-    return defaultBase;
-  }
 
   let highestNum = -1;
   let highestStr = defaultBase;
 
-  existingInvoices.forEach(inv => {
-    const invNumStr = inv.invoiceNumber || inv.invoiceNo;
+  const checkItem = (invNumStr) => {
     if (invNumStr) {
       const match = String(invNumStr).match(/^(.*?)(\d+)$/);
       if (match) {
@@ -35,7 +33,10 @@ const getNextInvoiceSequence = (settingNo, existingInvoices) => {
         }
       }
     }
-  });
+  };
+
+  (existingInvoices || []).forEach(inv => checkItem(inv.invoiceNumber || inv.invoiceNo || inv.invoice_no));
+  (existingSolderingJobs || []).forEach(job => checkItem(job.invoiceNumber || job.invoiceNo || job.invoice_number || job.receiptNo));
 
   if (highestNum === -1) {
     return defaultBase;
@@ -52,6 +53,18 @@ const getNextInvoiceSequence = (settingNo, existingInvoices) => {
   }
 
   return nextFromDb;
+};
+
+const calculateItemAmount = (netWeight, wastagePct, rate, makingCharges, stoneWeight = 0) => {
+  const nw = Number(netWeight) || 0;
+  const wp = Number(wastagePct) || 0;
+  const r = Number(rate) || 0;
+  const mc = Number(makingCharges) || 0;
+  const sw = Number(stoneWeight) || 0;
+
+  const grossWeight = Math.max(0, nw * (1 + wp / 100) - sw);
+  const amt = (grossWeight * r) + mc;
+  return Math.round(amt * 100) / 100;
 };
 
 const Invoice = () => {
@@ -119,41 +132,60 @@ const Invoice = () => {
 
   const loadData = async () => {
     try {
-      // Load customers
-      const custRes = await window.electronAPI?.getAllCustomers();
-      if (custRes) setCustomers(custRes);
+      const api = window.electronAPI || supabaseAPI;
+      // Load customers safely
+      let custRes = [];
+      try {
+        if (api?.getAllCustomers) custRes = await api.getAllCustomers();
+      } catch (e) {
+        console.error("Error loading customers:", e);
+      }
+      if (Array.isArray(custRes)) setCustomers(custRes);
 
-      // Load settings and existing invoices to calculate true next sequence number
-      const [settingsRes, invRes] = await Promise.all([
-        window.electronAPI?.getOrganizationSettings(),
-        window.electronAPI?.getAllInvoices()
-      ]);
+      // Load settings, invoices, and soldering jobs safely
+      let settingsRes = null;
+      let invRes = [];
+      let soldRes = [];
 
-      if (invRes) setInvoices(invRes);
+      try {
+        if (api?.getOrganizationSettings) settingsRes = await api.getOrganizationSettings();
+      } catch (e) { console.error("Error loading org settings:", e); }
+
+      try {
+        if (api?.getAllInvoices) invRes = await api.getAllInvoices();
+      } catch (e) { console.error("Error loading invoices:", e); }
+
+      try {
+        if (api?.getAllSolderingJobs) soldRes = await api.getAllSolderingJobs();
+      } catch (e) { console.error("Error loading soldering jobs:", e); }
+
+      if (Array.isArray(invRes)) setInvoices(invRes);
       const settingNo = settingsRes?.next_invoice_number || 'INV-1001';
-      const nextSeqNo = getNextInvoiceSequence(settingNo, invRes || []);
+      const nextSeqNo = getNextInvoiceSequence(settingNo, Array.isArray(invRes) ? invRes : [], Array.isArray(soldRes) ? soldRes : []);
       setInvoiceData(prev => ({ ...prev, invoiceNo: nextSeqNo }));
 
       // Load live gold rates (22K)
-      const ratesRes = await window.electronAPI?.getMetalRates();
-      if (ratesRes?.success && ratesRes.metal_rates?.length > 0) {
-        const rate = parseFloat(ratesRes.metal_rates[0].gold_rate) || 0;
-        setLiveGoldRate(rate);
-        
-        // Update default rate in first item if not edited
-        setInvoiceData(prev => {
-          const newItems = [...prev.items];
-          newItems[0].rate = rate;
-          newItems[0].amount = calculateItemAmount(
-            newItems[0].netWeight,
-            newItems[0].wastagePct,
-            rate,
-            newItems[0].makingCharges,
-            newItems[0].stoneWeight
-          );
-          return { ...prev, items: newItems };
-        });
-      }
+      try {
+        const ratesRes = api?.getMetalRates ? await api.getMetalRates() : null;
+        if (ratesRes?.success && ratesRes.metal_rates?.length > 0) {
+          const rate = parseFloat(ratesRes.metal_rates[0].gold_rate) || 0;
+          setLiveGoldRate(rate);
+          
+          setInvoiceData(prev => {
+            if (!prev.items || prev.items.length === 0) return prev;
+            const newItems = [...prev.items];
+            newItems[0].rate = rate;
+            newItems[0].amount = calculateItemAmount(
+              newItems[0].netWeight,
+              newItems[0].wastagePct,
+              rate,
+              newItems[0].makingCharges,
+              newItems[0].stoneWeight
+            );
+            return { ...prev, items: newItems };
+          });
+        }
+      } catch (e) { console.error("Error loading gold rates:", e); }
     } catch (error) {
       console.error("Error loading billing data:", error);
     }
@@ -162,10 +194,13 @@ const Invoice = () => {
   const loadInvoicesHistory = async () => {
     try {
       setHistoryLoading(true);
-      const res = await window.electronAPI?.getAllInvoices();
-      if (res) setInvoices(res);
+      const api = window.electronAPI || supabaseAPI;
+      const res = api?.getAllInvoices ? await api.getAllInvoices() : [];
+      if (Array.isArray(res)) setInvoices(res);
+      else setInvoices([]);
     } catch (error) {
       console.error("Error loading invoice history:", error);
+      setInvoices([]);
     } finally {
       setHistoryLoading(false);
     }
@@ -174,10 +209,11 @@ const Invoice = () => {
   const handleClosePreview = async () => {
     setShowPreview(false);
     if (!invoiceData.id) {
-      const freshInvoices = (await window.electronAPI?.getAllInvoices()) || invoices;
-      const settingsRes = await window.electronAPI?.getOrganizationSettings();
-      const nextSeqNo = getNextInvoiceSequence(settingsRes?.next_invoice_number, freshInvoices);
-
+      const api = window.electronAPI || supabaseAPI;
+      const freshInvoices = (api?.getAllInvoices ? await api.getAllInvoices() : null) || (Array.isArray(invoices) ? invoices : []);
+      const freshSoldering = api?.getAllSolderingJobs ? await api.getAllSolderingJobs() : [];
+      const settingsRes = api?.getOrganizationSettings ? await api.getOrganizationSettings() : null;
+      const nextSeqNo = getNextInvoiceSequence(settingsRes?.next_invoice_number, freshInvoices, freshSoldering);
       setInvoiceData({
         id: null,
         invoiceNo: nextSeqNo,
@@ -210,11 +246,13 @@ const Invoice = () => {
 
   const handleReloadSequence = async () => {
     try {
-      const [settingsRes, invRes] = await Promise.all([
-        window.electronAPI?.getOrganizationSettings(),
-        window.electronAPI?.getAllInvoices()
+      const api = window.electronAPI || supabaseAPI;
+      const [settingsRes, invRes, soldRes] = await Promise.all([
+        api?.getOrganizationSettings ? api.getOrganizationSettings() : Promise.resolve(null),
+        api?.getAllInvoices ? api.getAllInvoices() : Promise.resolve([]),
+        api?.getAllSolderingJobs ? api.getAllSolderingJobs() : Promise.resolve([])
       ]);
-      const nextSeqNo = getNextInvoiceSequence(settingsRes?.next_invoice_number, invRes || invoices);
+      const nextSeqNo = getNextInvoiceSequence(settingsRes?.next_invoice_number, invRes || invoices, soldRes || []);
       setInvoiceData(prev => ({ ...prev, invoiceNo: nextSeqNo }));
     } catch (err) {
       console.error(err);
@@ -226,18 +264,6 @@ const Invoice = () => {
     if (tab === "history") {
       loadInvoicesHistory();
     }
-  };
-
-  const calculateItemAmount = (netWeight, wastagePct, rate, makingCharges, stoneWeight = 0) => {
-    const nw = Number(netWeight) || 0;
-    const wp = Number(wastagePct) || 0;
-    const r = Number(rate) || 0;
-    const mc = Number(makingCharges) || 0;
-    const sw = Number(stoneWeight) || 0;
-
-    const grossWeight = Math.max(0, nw * (1 + wp / 100) - sw);
-    const amt = (grossWeight * r) + mc;
-    return Math.round(amt * 100) / 100;
   };
 
   const calculateSubTotal = () => {
@@ -293,21 +319,16 @@ const Invoice = () => {
         const invoice = invoices.find(inv => inv.id === invoiceId);
         let photos = [];
         if (invoice && invoice.productPhoto) {
-          try {
-            if (invoice.productPhoto.startsWith('[')) {
-              photos = JSON.parse(invoice.productPhoto);
-            } else {
-              photos = [invoice.productPhoto];
-            }
-          } catch (e) {
-            photos = [invoice.productPhoto];
-          }
+          photos = parseInvoicePhotos(invoice.productPhoto);
         }
         
         photos.push(base64Photo);
         const stringified = JSON.stringify(photos);
 
-        await window.electronAPI?.updateInvoicePhoto(invoiceId, stringified);
+        const api = window.electronAPI || supabaseAPI;
+        if (api?.updateInvoicePhoto) {
+          await api.updateInvoicePhoto(invoiceId, stringified);
+        }
         
         // Update local invoices state so the list immediately shows the thumbnail
         setInvoices(prev => prev.map(inv => {
@@ -349,21 +370,16 @@ const Invoice = () => {
       const invoice = invoices.find(inv => inv.id === invoiceId);
       let photos = [];
       if (invoice && invoice.productPhoto) {
-        try {
-          if (invoice.productPhoto.startsWith('[')) {
-            photos = JSON.parse(invoice.productPhoto);
-          } else {
-            photos = [invoice.productPhoto];
-          }
-        } catch (e) {
-          photos = [invoice.productPhoto];
-        }
+        photos = parseInvoicePhotos(invoice.productPhoto);
       }
 
       photos.splice(indexToDelete, 1);
       const stringified = photos.length > 0 ? JSON.stringify(photos) : null;
 
-      await window.electronAPI?.updateInvoicePhoto(invoiceId, stringified);
+      const api = window.electronAPI || supabaseAPI;
+      if (api?.updateInvoicePhoto) {
+        await api.updateInvoicePhoto(invoiceId, stringified);
+      }
       
       setInvoices(prev => prev.map(inv => {
         if (inv.id === invoiceId) {
@@ -397,9 +413,12 @@ const Invoice = () => {
 
   const parseInvoicePhotos = (productPhotoStr) => {
     if (!productPhotoStr) return [];
+    if (Array.isArray(productPhotoStr)) return productPhotoStr;
+    if (typeof productPhotoStr !== 'string') return [];
     try {
       if (productPhotoStr.startsWith('[')) {
-        return JSON.parse(productPhotoStr);
+        const parsed = JSON.parse(productPhotoStr);
+        return Array.isArray(parsed) ? parsed : [productPhotoStr];
       }
       return [productPhotoStr];
     } catch (e) {
@@ -512,21 +531,26 @@ const Invoice = () => {
         }))
       };
 
-      const res = await window.electronAPI?.saveInvoice(payload);
+      const api = window.electronAPI || supabaseAPI;
+      const res = api?.saveInvoice ? await api.saveInvoice(payload) : null;
       if (res?.id) {
+        const actualInvoiceNo = res.invoiceNo || payload.invoiceNo;
         // Increment and update the next invoice number in settings
-        const nextNo = incrementInvoiceNo(invoiceData.invoiceNo);
-        await window.electronAPI?.updateOrganizationSettings(nextNo);
+        const nextNo = incrementInvoiceNo(actualInvoiceNo);
+        if (api?.updateOrganizationSettings) {
+          await api.updateOrganizationSettings(nextNo);
+        }
 
-        const savedObj = { ...payload, id: res.id, invoiceNo: invoiceData.invoiceNo, invoiceNumber: invoiceData.invoiceNo };
-        setInvoices(prev => [savedObj, ...prev]);
+        const savedObj = { ...payload, id: res.id, invoiceNo: actualInvoiceNo, invoiceNumber: actualInvoiceNo };
+        setInvoices(prev => (Array.isArray(prev) ? [savedObj, ...prev] : [savedObj]));
+        setInvoiceData(prev => ({ ...prev, invoiceNo: actualInvoiceNo }));
 
-        alert("Invoice saved to database successfully!");
+        alert(`Invoice (${actualInvoiceNo}) saved to database successfully!`);
         setShowPreview(true);
       }
     } catch (error) {
       console.error("Error saving invoice:", error);
-      alert("Failed to save invoice. Invoice number might be duplicate.");
+      alert(`Failed to save invoice: ${error?.message || "Please try again."}`);
     } finally {
       setSubmitting(false);
     }
@@ -544,8 +568,11 @@ const Invoice = () => {
   const handleDeleteInvoice = async (id) => {
     if (window.confirm("Are you sure you want to delete this invoice permanently?")) {
       try {
-        await window.electronAPI?.deleteInvoice(id);
-        setInvoices(prev => prev.filter(inv => inv.id !== id));
+        const api = window.electronAPI || supabaseAPI;
+        if (api?.deleteInvoice) {
+          await api.deleteInvoice(id);
+        }
+        setInvoices(prev => (Array.isArray(prev) ? prev.filter(inv => inv.id !== id) : []));
       } catch (error) {
         console.error(error);
         alert("Failed to delete invoice.");
@@ -555,31 +582,32 @@ const Invoice = () => {
 
   const handleLoadInvoiceDetails = async (id) => {
     try {
-      const res = await window.electronAPI?.getInvoiceById(id);
+      const api = window.electronAPI || supabaseAPI;
+      const res = api?.getInvoiceById ? await api.getInvoiceById(id) : null;
       if (res) {
         // Map back to input model
         setInvoiceData({
-          invoiceNo: res.invoiceNo,
-          date: res.date,
-          customerId: res.customerId,
-          consignee: res.customerName,
-          items: res.items.map(i => ({
-            description: i.description,
-            hsnCode: i.hsnCode,
-            netWeight: i.netWeight,
-            wastagePct: i.wastagePct,
-            stoneWeight: i.stoneWeight || 0,
-            rate: i.ratePerGram,
-            makingCharges: i.makingCharges,
-            amount: i.amount
+          invoiceNo: res.invoiceNo || res.invoice_no || '',
+          date: res.date || new Date().toISOString().split("T")[0],
+          customerId: res.customerId || res.customer_id || null,
+          consignee: res.customerName || res.customer_name || '',
+          items: (res.items || []).map(i => ({
+            description: i.description || 'Gold Ornament',
+            hsnCode: i.hsnCode || i.hsn_code || '7113',
+            netWeight: parseFloat(i.netWeight || i.net_weight || 0),
+            wastagePct: parseFloat(i.wastagePct || i.wastage_pct || 0),
+            stoneWeight: parseFloat(i.stoneWeight || i.stone_weight || 0),
+            rate: parseFloat(i.ratePerGram || i.rate_per_gram || i.rate || 0),
+            makingCharges: parseFloat(i.makingCharges || i.making_charges || 0),
+            amount: parseFloat(i.amount || 0)
           })),
-          cgstRate: res.cgstRate,
-          sgstRate: res.sgstRate,
-          oldGoldWeight: res.oldGoldWeight,
-          oldGoldRate: res.oldGoldWeight > 0 ? (res.oldGoldAmount / res.oldGoldWeight) : 0,
-          oldGoldAmount: res.oldGoldAmount,
-          otherCharges: res.otherCharges || 0,
-          productPhoto: res.productPhoto || null,
+          cgstRate: parseFloat(res.cgstRate || res.cgst_rate || 1.5),
+          sgstRate: parseFloat(res.sgstRate || res.sgst_rate || 1.5),
+          oldGoldWeight: parseFloat(res.oldGoldWeight || res.old_gold_weight || 0),
+          oldGoldRate: parseFloat(res.oldGoldRate || (res.oldGoldWeight > 0 ? res.oldGoldAmount / res.oldGoldWeight : 0)),
+          oldGoldAmount: parseFloat(res.oldGoldAmount || res.old_gold_amount || 0),
+          otherCharges: parseFloat(res.otherCharges || res.other_charges || 0),
+          productPhoto: res.productPhoto || res.product_photo || null,
           id: res.id
         });
         setShowPreview(true);
@@ -620,14 +648,19 @@ const Invoice = () => {
     return result + ' Only';
   };
 
-  const filteredHistory = invoices.filter(inv => {
-    const q = historySearch.toLowerCase();
-    return inv.invoiceNo.toLowerCase().includes(q) || inv.customerName.toLowerCase().includes(q);
+  const filteredHistory = (invoices || []).filter(inv => {
+    if (!inv) return false;
+    const q = (historySearch || '').toLowerCase().trim();
+    const invNo = String(inv.invoiceNo || inv.invoiceNumber || '').toLowerCase();
+    const custName = String(inv.customerName || inv.consignee || '').toLowerCase();
+    return invNo.includes(q) || custName.includes(q);
   });
 
-  const filteredCustomers = customers.filter(c => {
-    const q = custSearch.toLowerCase();
-    return `${c.name} ${c.surname} ${c.mobile}`.toLowerCase().includes(q);
+  const filteredCustomers = (customers || []).filter(c => {
+    if (!c) return false;
+    const q = (custSearch || '').toLowerCase().trim();
+    const nameStr = `${c.title || ''} ${c.name || ''} ${c.surname || ''} ${c.mobile || ''}`.toLowerCase();
+    return nameStr.includes(q);
   });
 
   const subTotal = calculateSubTotal();
@@ -971,24 +1004,30 @@ const Invoice = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredHistory.map(inv => (
-                    <tr key={inv.id}>
-                      <td>{inv.date}</td>
-                      <td>
-                        <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--gold-300)' }}>{inv.invoiceNo}</span>
-                      </td>
-                      <td>{inv.customerName}</td>
-                      <td>₹{inv.subtotal.toLocaleString('en-IN')}</td>
-                      <td>
-                        {inv.oldGoldAmount > 0 ? (
-                          <span style={{ color: '#f87171' }}>- ₹{inv.oldGoldAmount.toLocaleString('en-IN')}</span>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)' }}>—</span>
-                        )}
-                      </td>
-                      <td>
-                        <strong style={{ color: '#4ade80' }}>₹{inv.finalAmount.toLocaleString('en-IN')}</strong>
-                      </td>
+                  {filteredHistory.map(inv => {
+                    const invNo = inv.invoiceNo || inv.invoiceNumber || '—';
+                    const custName = inv.customerName || inv.consignee || '—';
+                    const sub = parseFloat(inv.subtotal || inv.subTotal || 0);
+                    const oldGold = parseFloat(inv.oldGoldAmount || 0);
+                    const finalAmt = parseFloat(inv.finalAmount || inv.grandTotal || inv.subtotal || 0);
+                    return (
+                      <tr key={inv.id || invNo}>
+                        <td>{inv.date || '—'}</td>
+                        <td>
+                          <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--gold-300)' }}>{invNo}</span>
+                        </td>
+                        <td>{custName}</td>
+                        <td>₹{sub.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td>
+                          {oldGold > 0 ? (
+                            <span style={{ color: '#f87171' }}>- ₹{oldGold.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                        <td>
+                          <strong style={{ color: '#4ade80' }}>₹{finalAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+                        </td>
                       <td>
                         {(() => {
                           const photosList = parseInvoicePhotos(inv.productPhoto);
@@ -1092,7 +1131,8 @@ const Invoice = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  );
+                })}
                 </tbody>
               </table>
             </div>
