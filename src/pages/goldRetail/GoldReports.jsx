@@ -4,6 +4,7 @@ import { supabaseAPI } from '../../db/supabaseAPI';
 export default function GoldReports() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview'); // overview, invoices, receipts, orders, stock, digigold, soldering
+  const [showPdfPreviewModal, setShowPdfPreviewModal] = useState(false);
 
   // Data States
   const [invoices, setInvoices] = useState([]);
@@ -14,6 +15,30 @@ export default function GoldReports() {
   const [solderingJobs, setSolderingJobs] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [metalRates, setMetalRates] = useState(null);
+
+  // Helper convertToWords for A4 Invoices PDF Export
+  const convertToWords = (num) => {
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+      'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    const numString = Math.round(Number(num) || 0).toString();
+    const rupees = parseInt(numString) || 0;
+
+    if (rupees === 0) return 'Zero Only';
+
+    function convertNumberToWords(n) {
+      if (n === 0) return '';
+      if (n < 20) return ones[n];
+      if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + ones[n % 10] : '');
+      if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + convertNumberToWords(n % 100) : '');
+      if (n < 100000) return convertNumberToWords(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + convertNumberToWords(n % 1000) : '');
+      if (n < 10000000) return convertNumberToWords(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + convertNumberToWords(n % 100000) : '');
+      return convertNumberToWords(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + convertNumberToWords(n % 10000000) : '');
+    }
+
+    return `Rupees ${convertNumberToWords(rupees)} Only`;
+  };
 
   // Filters
   const [dateRangeOption, setDateRangeOption] = useState('month'); // today, week, month, all, custom
@@ -259,12 +284,43 @@ export default function GoldReports() {
 
     // Collect all invoices
     (filteredInvoices || []).forEach((inv, idx) => {
-      const grandTotal = parseFloat(inv.grandTotal || inv.finalAmount || inv.totalAmount || 0);
-      const taxAmount = parseFloat(inv.taxAmount || inv.gstAmount || 0);
-      const subtotal = parseFloat(inv.subtotal || inv.taxableAmount || (grandTotal - taxAmount));
-      const cgst = parseFloat(inv.cgstAmount || (taxAmount / 2));
-      const sgst = parseFloat(inv.sgstAmount || (taxAmount / 2));
+      let cgst = parseFloat(inv.cgstAmount ?? inv.cgst_amount ?? 0);
+      let sgst = parseFloat(inv.sgstAmount ?? inv.sgst_amount ?? 0);
+      let subtotal = parseFloat(inv.subtotal ?? inv.taxableAmount ?? 0);
+      let grandTotal = parseFloat(inv.grandTotal ?? inv.finalAmount ?? inv.totalAmount ?? 0);
+      let taxAmount = parseFloat(inv.taxAmount ?? inv.gstAmount ?? (cgst + sgst));
+
+      // Fallback: If taxAmount is 0 but subtotal or grandTotal exists, compute 3% GST (1.5% CGST + 1.5% SGST)
+      if (taxAmount === 0) {
+        if (subtotal > 0) {
+          taxAmount = Math.round(subtotal * 0.03 * 100) / 100;
+          cgst = Math.round((taxAmount / 2) * 100) / 100;
+          sgst = Math.round((taxAmount / 2) * 100) / 100;
+        } else if (grandTotal > 0) {
+          subtotal = Math.round((grandTotal / 1.03) * 100) / 100;
+          taxAmount = Math.round((grandTotal - subtotal) * 100) / 100;
+          cgst = Math.round((taxAmount / 2) * 100) / 100;
+          sgst = Math.round((taxAmount / 2) * 100) / 100;
+        }
+      }
+
+      if (grandTotal === 0 && subtotal > 0) {
+        grandTotal = subtotal + taxAmount;
+      }
+      if (subtotal === 0 && grandTotal > 0) {
+        subtotal = grandTotal - taxAmount;
+      }
+
       const rawDate = inv.createdAt || inv.created_at || inv.date || '';
+
+      // Extract actual HSN code(s) from invoice items if present
+      let extractedHsn = '';
+      if (Array.isArray(inv.items) && inv.items.length > 0) {
+        const hsnList = inv.items.map(i => i.hsnCode || i.hsn_code).filter(Boolean);
+        if (hsnList.length > 0) {
+          extractedHsn = [...new Set(hsnList)].join(', ');
+        }
+      }
 
       combinedRaw.push({
         id: inv.id || `inv-${idx}`,
@@ -274,14 +330,15 @@ export default function GoldReports() {
         date: formatDate(inv.createdAt || inv.created_at || inv.date),
         rawTime: new Date(rawDate).getTime() || 0,
         customerName: inv.customerName || 'Walk-in Customer',
-        hsnSac: '7113',
+        hsnSac: extractedHsn || inv.hsnCode || inv.hsn_code || '7113',
         taxableAmount: subtotal,
         gstRateLabel: '3% (1.5% CGST + 1.5% SGST)',
         cgstAmount: cgst,
         sgstAmount: sgst,
         totalGstAmount: taxAmount,
         grandTotal: grandTotal,
-        paymentMode: inv.paymentMode || inv.paymentType || 'Cash'
+        paymentMode: inv.paymentMode || inv.paymentType || 'Cash',
+        rawInvoice: inv
       });
     });
 
@@ -300,14 +357,15 @@ export default function GoldReports() {
         date: formatDate(job.createdAt || job.created_at || job.date),
         rawTime: new Date(rawDate).getTime() || 0,
         customerName: job.customerName || job.customer_name || '—',
-        hsnSac: '9988 / 9983',
+        hsnSac: '7113',
         taxableAmount: marking,
         gstRateLabel: '5% (2.5% CGST + 2.5% SGST)',
         cgstAmount: gst / 2,
         sgstAmount: gst / 2,
         totalGstAmount: gst,
         grandTotal: total,
-        paymentMode: 'Service / Cash'
+        paymentMode: 'Service / Cash',
+        rawJob: job
       });
     });
 
@@ -573,10 +631,13 @@ export default function GoldReports() {
 
           {/* Action Buttons */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button onClick={() => setShowPdfPreviewModal(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+              📄 Export to PDF (A4)
+            </button>
             <button onClick={handleExportCSV} className="btn-secondary" style={{ padding: '8px 14px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
               📥 Export CSV
             </button>
-            <button onClick={handlePrint} className="btn-primary" style={{ padding: '8px 16px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+            <button onClick={handlePrint} className="btn-secondary" style={{ padding: '8px 16px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
               🖨️ Print Full Report
             </button>
           </div>
@@ -1110,9 +1171,14 @@ export default function GoldReports() {
                       Unified sequential tax invoice ledger ordered continuously by Invoice Number for GSTR-1 & GST returns
                     </div>
                   </div>
-                  <button onClick={handleExportGSTReportCSV} className="btn-primary" style={{ padding: '8px 16px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
-                    📥 Export GSTR-1 CSV
-                  </button>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button onClick={() => setShowPdfPreviewModal(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                      📄 Export to PDF (A4)
+                    </button>
+                    <button onClick={handleExportGSTReportCSV} className="btn-secondary" style={{ padding: '8px 16px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                      📥 Export GSTR-1 CSV
+                    </button>
+                  </div>
                 </div>
 
                 {/* GST KPI Statistics Cards */}
@@ -1205,6 +1271,36 @@ export default function GoldReports() {
                         </tr>
                       )}
                     </tbody>
+                    {combinedGstLedger.length > 0 && (
+                      <tfoot>
+                        <tr style={{
+                          borderTop: '2px solid var(--gold-300)',
+                          background: 'rgba(251,191,36,0.06)',
+                          fontWeight: 800,
+                          fontSize: 12
+                        }}>
+                          <td colSpan="5" style={{ padding: '12px 10px', color: 'var(--gold-300)', textAlign: 'right' }}>
+                            Grand Total ({gstStats.count} Invoices):
+                          </td>
+                          <td style={{ padding: '12px 10px', textAlign: 'right', color: '#38bdf8' }}>
+                            ₹{gstStats.totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td style={{ padding: '12px 10px' }}></td>
+                          <td style={{ padding: '12px 10px', textAlign: 'right', color: '#c084fc' }}>
+                            ₹{gstStats.totalCgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td style={{ padding: '12px 10px', textAlign: 'right', color: '#f472b6' }}>
+                            ₹{gstStats.totalSgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td style={{ padding: '12px 10px', textAlign: 'right', color: '#f472b6', fontSize: 13 }}>
+                            ₹{gstStats.totalGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td style={{ padding: '12px 10px', textAlign: 'right', color: '#4ade80', fontSize: 13 }}>
+                            ₹{gstStats.totalGrand.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
                   </table>
                 </div>
               </div>
@@ -1212,6 +1308,533 @@ export default function GoldReports() {
           )}
         </>
       )}
+
+      {/* ── COMBINED GST A4 INVOICES PDF PREVIEW MODAL ──────────── */}
+      {showPdfPreviewModal && (
+        <div className="modal-overlay" style={{ zIndex: 11000 }}>
+          <div className="modal-box" style={{ maxWidth: 920, padding: 0 }}>
+            {/* Modal Header */}
+            <div className="modal-header" style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div className="modal-title" style={{ fontSize: 15, fontWeight: 700, color: 'var(--gold-300)' }}>
+                  📄 Combined GST Invoices A4 PDF Export Preview ({combinedGstLedger.length} Invoices)
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  Ordered sequentially by Invoice Number • Includes Gold Retail &amp; Soldering Invoices
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => window.print()}
+                  className="btn-primary"
+                  style={{ padding: '7px 16px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}
+                >
+                  🖨️ Print / Save as PDF
+                </button>
+                <button
+                  onClick={() => setShowPdfPreviewModal(false)}
+                  className="btn-secondary"
+                  style={{ padding: '7px 14px', fontSize: 12 }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Preview Area */}
+            <div style={{
+              background: '#525659',
+              padding: '24px 20px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 24
+            }}>
+              {combinedGstLedger.length === 0 ? (
+                <div style={{ padding: 40, color: '#fff', textAlign: 'center' }}>
+                  No tax invoices available to export in current filter range.
+                </div>
+              ) : (
+                combinedGstLedger.map((item, index) => {
+                  const rawInv = item.rawInvoice;
+                  const rawJ = item.rawJob;
+                  const itemsList = rawInv?.items && rawInv.items.length > 0 ? rawInv.items : [
+                    { description: 'Gold Jewellery Ornament', hsnCode: '7113', netWeight: 0, wastagePct: 0, stoneWeight: 0, amount: item.taxableAmount }
+                  ];
+
+                  const totalNetWt = itemsList.reduce((s, i) => s + (Number(i.netWeight || i.net_weight) || 0), 0);
+                  const totalStoneWt = itemsList.reduce((s, i) => s + (Number(i.stoneWeight || i.stone_weight) || 0), 0);
+                  const totalGrossWt = itemsList.reduce((s, i) => s + Math.max(0, (Number(i.netWeight || i.net_weight) || 0) * (1 + (Number(i.wastagePct || i.wastage_pct) || 0) / 100) - (Number(i.stoneWeight || i.stone_weight) || 0)), 0);
+
+                  const otherChg = Number(rawInv?.otherCharges) || 0;
+                  const oldGoldAmt = Number(rawInv?.oldGoldAmount) || 0;
+                  const finalPayable = Number(rawInv?.finalAmount || item.grandTotal);
+
+                  return (
+                    <div key={item.id || index} style={{
+                      background: '#ffffff',
+                      color: '#0f172a',
+                      width: '100%',
+                      maxWidth: '750px',
+                      padding: '32px 36px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+                      borderRadius: 4,
+                      fontFamily: 'sans-serif',
+                      fontSize: '12px',
+                      lineHeight: '1.4'
+                    }}>
+                      {/* Header */}
+                      <div style={{ textAlign: 'center', marginBottom: 18 }}>
+                        <h2 style={{ margin: '0 0 4px 0', fontSize: 24, letterSpacing: 0.5, fontWeight: 800, color: '#0f172a' }}>M S GOLD SMITH</h2>
+                        <p style={{ margin: '2px 0', fontSize: 12, color: '#334155' }}>No.37C, Chettiyakudi South Street, Nadaga Salai,</p>
+                        <p style={{ margin: '2px 0', fontSize: 12, color: '#334155' }}>Srivilliputhur, Virudhunagar - 626 125.</p>
+                        <p style={{ margin: '2px 0', fontSize: 12, color: '#334155' }}><strong>GSTIN:</strong> 33BDVPR1363J1Z2 | <strong>Mobile:</strong> 94431 12034</p>
+                        <h3 style={{ margin: '12px 0 4px 0', fontSize: 15, textDecoration: 'underline', fontWeight: 700, color: '#0f172a' }}>TAX INVOICE</h3>
+                        <span style={{ fontSize: 11, fontStyle: 'italic', color: '#64748b' }}>Original for Recipient</span>
+                      </div>
+
+                      {/* Consignee details */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', border: '1px solid #b45309', padding: 10, marginBottom: 18, fontSize: 12, background: '#fffdf5' }}>
+                        <div>
+                          <strong>Consignee Details:</strong>
+                          <div style={{ marginTop: 4, fontWeight: 700, fontSize: 13 }}>{item.customerName}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div><strong>Invoice No:</strong> <span style={{ fontWeight: 700, color: '#b45309' }}>{item.invoiceNo}</span></div>
+                          <div><strong>Date:</strong> {item.date}</div>
+                          <div><strong>Document Type:</strong> {item.typeLabel}</div>
+                        </div>
+                      </div>
+
+                      {item.source === 'Invoice' ? (
+                        /* Retail Invoice Table */
+                        <>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 18, fontSize: 11, border: '1px solid #b45309' }}>
+                            <thead>
+                              <tr style={{ background: '#fef3c7', borderBottom: '1px solid #b45309' }}>
+                                <th style={{ border: '1px solid #b45309', padding: 6, width: 30, textAlign: 'center' }}>S.N</th>
+                                <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'left' }}>Description of Ornaments</th>
+                                <th style={{ border: '1px solid #b45309', padding: 6, width: 55, textAlign: 'center' }}>HSN</th>
+                                <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 65 }}>Net Wt (g)</th>
+                                <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 55 }}>Wastage %</th>
+                                <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 60 }}>Stone Wt</th>
+                                <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 65 }}>Gross Wt</th>
+                                <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 65 }}>Rate/g</th>
+                                <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 65 }}>Making (₹)</th>
+                                <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 85 }}>Amount (₹)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {itemsList.map((it, idx2) => {
+                                const nw = Number(it.netWeight || it.net_weight) || 0;
+                                const wp = Number(it.wastagePct || it.wastage_pct) || 0;
+                                const sw = Number(it.stoneWeight || it.stone_weight) || 0;
+                                const gross = Math.max(0, nw * (1 + wp / 100) - sw);
+                                const rate = Number(it.rate || it.ratePerGram || it.rate_per_gram) || 0;
+                                const making = Number(it.makingCharges || it.making_charges) || 0;
+                                const amt = Number(it.amount) || 0;
+
+                                return (
+                                  <tr key={idx2}>
+                                    <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'center' }}>{idx2 + 1}</td>
+                                    <td style={{ border: '1px solid #b45309', padding: 6, fontWeight: 600 }}>{it.description || 'Gold Ornament'}</td>
+                                    <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'center', fontFamily: 'monospace' }}>{it.hsnCode || it.hsn_code || item.hsnSac || '7113'}</td>
+                                    <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{nw ? nw.toFixed(3) + 'g' : '—'}</td>
+                                    <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{wp ? wp + '%' : '—'}</td>
+                                    <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{sw ? sw.toFixed(3) + 'g' : '—'}</td>
+                                    <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{gross ? gross.toFixed(3) + 'g' : '—'}</td>
+                                    <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{rate ? '₹' + rate.toLocaleString('en-IN') : '—'}</td>
+                                    <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{making ? '₹' + making.toLocaleString('en-IN') : '—'}</td>
+                                    <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{amt ? amt.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : item.taxableAmount.toFixed(2)}</td>
+                                  </tr>
+                                );
+                              })}
+                              {otherChg > 0 && (
+                                <tr>
+                                  <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'center' }}>{itemsList.length + 1}</td>
+                                  <td style={{ border: '1px solid #b45309', padding: 6 }} colSpan="8">Other Charges / Additions</td>
+                                  <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{otherChg.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                                </tr>
+                              )}
+                              <tr style={{ fontWeight: 'bold', background: '#fffdf5' }}>
+                                <td colSpan="3" style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>Total Weight &amp; Subtotal:</td>
+                                <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{totalNetWt ? totalNetWt.toFixed(3) + 'g' : '—'}</td>
+                                <td style={{ border: '1px solid #b45309' }}></td>
+                                <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{totalStoneWt ? totalStoneWt.toFixed(3) + 'g' : '—'}</td>
+                                <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{totalGrossWt ? totalGrossWt.toFixed(3) + 'g' : '—'}</td>
+                                <td colSpan="2" style={{ border: '1px solid #b45309' }}></td>
+                                <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{item.taxableAmount.toFixed(2)}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+
+                          {/* Tax breakdown & Words */}
+                          <div style={{ display: 'flex', gap: 12, marginBottom: 20, fontSize: 11 }}>
+                            <div style={{ flex: 1, border: '1px solid #b45309', padding: 10, background: '#fffdf5' }}>
+                              <strong>Amount Chargeable in Words:</strong>
+                              <div style={{ marginTop: 6, fontStyle: 'italic', fontWeight: 700 }}>{convertToWords(finalPayable)}</div>
+                            </div>
+                            <div style={{ width: 290 }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #b45309', fontSize: 11 }}>
+                                <tbody>
+                                  <tr>
+                                    <td style={{ border: '1px solid #b45309', padding: 4 }}>Subtotal Taxable</td>
+                                    <td style={{ border: '1px solid #b45309', padding: 4, textAlign: 'right' }}>₹{item.taxableAmount.toFixed(2)}</td>
+                                  </tr>
+                                  <tr>
+                                    <td style={{ border: '1px solid #b45309', padding: 4 }}>CGST ({rawInv?.cgstRate || 1.5}%)</td>
+                                    <td style={{ border: '1px solid #b45309', padding: 4, textAlign: 'right' }}>₹{item.cgstAmount.toFixed(2)}</td>
+                                  </tr>
+                                  <tr>
+                                    <td style={{ border: '1px solid #b45309', padding: 4 }}>SGST ({rawInv?.sgstRate || 1.5}%)</td>
+                                    <td style={{ border: '1px solid #b45309', padding: 4, textAlign: 'right' }}>₹{item.sgstAmount.toFixed(2)}</td>
+                                  </tr>
+                                  <tr style={{ fontWeight: 'bold', background: '#fef3c7' }}>
+                                    <td style={{ border: '1px solid #b45309', padding: 4 }}>Grand Total</td>
+                                    <td style={{ border: '1px solid #b45309', padding: 4, textAlign: 'right' }}>₹{item.grandTotal.toFixed(2)}</td>
+                                  </tr>
+                                  {oldGoldAmt > 0 && (
+                                    <>
+                                      <tr>
+                                        <td style={{ border: '1px solid #b45309', padding: 4, color: '#c00' }}>Old Gold Exchange (Deduction)</td>
+                                        <td style={{ border: '1px solid #b45309', padding: 4, textAlign: 'right', color: '#c00' }}>
+                                          - ₹{oldGoldAmt.toFixed(2)}
+                                        </td>
+                                      </tr>
+                                      <tr style={{ fontWeight: 'bold', background: '#fef3c7', fontSize: 12 }}>
+                                        <td style={{ border: '1px solid #b45309', padding: 4 }}>Final Payable Amount</td>
+                                        <td style={{ border: '1px solid #b45309', padding: 4, textAlign: 'right' }}>
+                                          ₹{finalPayable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                        </td>
+                                      </tr>
+                                    </>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        /* Soldering Invoice Table */
+                        <>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 18, fontSize: 12, border: '1px solid #b45309' }}>
+                            <thead>
+                              <tr style={{ background: '#fef3c7', borderBottom: '1px solid #b45309' }}>
+                                <th style={{ border: '1px solid #b45309', padding: 8, width: 35, textAlign: 'center' }}>S.N</th>
+                                <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'left' }}>Description of Work / Ornaments</th>
+                                <th style={{ border: '1px solid #b45309', padding: 8, width: 80, textAlign: 'center' }}>HSN</th>
+                                <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 110 }}>Marking Charge (₹)</th>
+                                <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 90 }}>CGST (2.5%)</th>
+                                <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 90 }}>SGST (2.5%)</th>
+                                <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 110 }}>Total Amount (₹)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'center' }}>1</td>
+                                <td style={{ border: '1px solid #b45309', padding: 8, fontWeight: 600 }}>{rawJ?.product || rawJ?.ornament || 'Soldering & Engraving Work'}</td>
+                                <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'center', fontFamily: 'monospace' }}>7113</td>
+                                <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{item.taxableAmount.toFixed(2)}</td>
+                                <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{item.cgstAmount.toFixed(2)}</td>
+                                <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{item.sgstAmount.toFixed(2)}</td>
+                                <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', fontWeight: 700 }}>₹{item.grandTotal.toFixed(2)}</td>
+                              </tr>
+                              <tr style={{ fontWeight: 'bold', background: '#fffdf5' }}>
+                                <td colSpan="3" style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>Subtotal &amp; Taxes:</td>
+                                <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{item.taxableAmount.toFixed(2)}</td>
+                                <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{item.cgstAmount.toFixed(2)}</td>
+                                <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{item.sgstAmount.toFixed(2)}</td>
+                                <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', color: '#b45309', fontSize: 13 }}>₹{item.grandTotal.toFixed(2)}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+
+                          {/* Words & Summary */}
+                          <div style={{ display: 'flex', gap: 14, marginBottom: 20, fontSize: 12 }}>
+                            <div style={{ flex: 1, border: '1px solid #b45309', padding: 10, background: '#fffdf5' }}>
+                              <strong>Amount Chargeable in Words:</strong>
+                              <div style={{ marginTop: 6, fontStyle: 'italic', fontWeight: 700 }}>{convertToWords(item.grandTotal)}</div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Declaration & Signature */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 30, fontSize: 11 }}>
+                        <div style={{ width: '60%' }}>
+                          <p style={{ margin: 0 }}><strong>Declaration:</strong></p>
+                          <p style={{ margin: '4px 0 0 0', fontSize: 10, lineHeight: 1.4, color: '#475569' }}>
+                            We declare that this invoice shows the actual price of the goods/services described and that all particulars are true and correct.
+                          </p>
+                        </div>
+                        <div style={{ textAlign: 'right', width: '35%' }}>
+                          <p style={{ margin: 0 }}>For <strong>M S GOLD SMITH</strong></p>
+                          <p style={{ marginTop: 40, borderTop: '1px solid #b45309', display: 'inline-block', width: 140, paddingTop: 4, fontWeight: 700 }}>Authorised Signatory</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── HIDDEN MULTI-INVOICE PRINT CONTAINER FOR window.print() PDF EXPORT ─ */}
+      <div className="printable-gst-pdf-container">
+        <style>{`
+          @page {
+            size: A4 portrait;
+            margin: 0mm;
+          }
+          @media print {
+            html, body {
+              width: 210mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+            }
+            body * {
+              visibility: hidden !important;
+            }
+            .printable-gst-pdf-container, .printable-gst-pdf-container * {
+              visibility: visible !important;
+            }
+            .printable-gst-pdf-container {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 210mm !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            .a4-pdf-page {
+              page-break-after: always !important;
+              break-after: page !important;
+              width: 210mm !important;
+              max-width: 210mm !important;
+              box-sizing: border-box !important;
+              padding: 10mm 12mm !important;
+              margin: 0 !important;
+              background: #ffffff !important;
+              color: #0f172a !important;
+              overflow: hidden !important;
+            }
+          }
+          @media screen {
+            .printable-gst-pdf-container {
+              display: none !important;
+            }
+          }
+        `}</style>
+        {combinedGstLedger.map((item, index) => {
+          const rawInv = item.rawInvoice;
+          const rawJ = item.rawJob;
+          const itemsList = rawInv?.items && rawInv.items.length > 0 ? rawInv.items : [
+            { description: 'Gold Jewellery Ornament', hsnCode: '7113', netWeight: 0, wastagePct: 0, stoneWeight: 0, amount: item.taxableAmount }
+          ];
+
+          const totalNetWt = itemsList.reduce((s, i) => s + (Number(i.netWeight || i.net_weight) || 0), 0);
+          const totalStoneWt = itemsList.reduce((s, i) => s + (Number(i.stoneWeight || i.stone_weight) || 0), 0);
+          const totalGrossWt = itemsList.reduce((s, i) => s + Math.max(0, (Number(i.netWeight || i.net_weight) || 0) * (1 + (Number(i.wastagePct || i.wastage_pct) || 0) / 100) - (Number(i.stoneWeight || i.stone_weight) || 0)), 0);
+
+          const otherChg = Number(rawInv?.otherCharges) || 0;
+          const oldGoldAmt = Number(rawInv?.oldGoldAmount) || 0;
+          const finalPayable = Number(rawInv?.finalAmount || item.grandTotal);
+
+          return (
+            <div key={item.id || index} className="a4-pdf-page">
+              {/* Header */}
+              <div style={{ textAlign: 'center', marginBottom: 18 }}>
+                <h2 style={{ margin: '0 0 4px 0', fontSize: 24, letterSpacing: 0.5, fontWeight: 800 }}>M S GOLD SMITH</h2>
+                <p style={{ margin: '2px 0', fontSize: 12 }}>No.37C, Chettiyakudi South Street, Nadaga Salai,</p>
+                <p style={{ margin: '2px 0', fontSize: 12 }}>Srivilliputhur, Virudhunagar - 626 125.</p>
+                <p style={{ margin: '2px 0', fontSize: 12 }}><strong>GSTIN:</strong> 33BDVPR1363J1Z2 | <strong>Mobile:</strong> 94431 12034</p>
+                <h3 style={{ margin: '12px 0 4px 0', fontSize: 15, textDecoration: 'underline', fontWeight: 700 }}>TAX INVOICE</h3>
+                <span style={{ fontSize: 11, fontStyle: 'italic' }}>Original for Recipient</span>
+              </div>
+
+              {/* Consignee details */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', border: '1px solid #b45309', padding: 10, marginBottom: 18, fontSize: 12 }}>
+                <div>
+                  <strong>Consignee Details:</strong>
+                  <div style={{ marginTop: 4, fontWeight: 700, fontSize: 13 }}>{item.customerName}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div><strong>Invoice No:</strong> <span>{item.invoiceNo}</span></div>
+                  <div><strong>Date:</strong> {item.date}</div>
+                  <div><strong>Document Type:</strong> {item.typeLabel}</div>
+                </div>
+              </div>
+
+              {item.source === 'Invoice' ? (
+                <>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 18, fontSize: 11, border: '1px solid #b45309' }}>
+                    <thead>
+                      <tr style={{ background: '#fef3c7', borderBottom: '1px solid #b45309' }}>
+                        <th style={{ border: '1px solid #b45309', padding: 6, width: 30, textAlign: 'center' }}>S.N</th>
+                        <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'left' }}>Description of Ornaments</th>
+                        <th style={{ border: '1px solid #b45309', padding: 6, width: 55, textAlign: 'center' }}>HSN</th>
+                        <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 65 }}>Net Wt (g)</th>
+                        <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 55 }}>Wastage %</th>
+                        <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 60 }}>Stone Wt</th>
+                        <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 65 }}>Gross Wt</th>
+                        <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 65 }}>Rate/g</th>
+                        <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 65 }}>Making (₹)</th>
+                        <th style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right', width: 85 }}>Amount (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {itemsList.map((it, idx2) => {
+                        const nw = Number(it.netWeight || it.net_weight) || 0;
+                        const wp = Number(it.wastagePct || it.wastage_pct) || 0;
+                        const sw = Number(it.stoneWeight || it.stone_weight) || 0;
+                        const gross = Math.max(0, nw * (1 + wp / 100) - sw);
+                        const rate = Number(it.rate || it.ratePerGram || it.rate_per_gram) || 0;
+                        const making = Number(it.makingCharges || it.making_charges) || 0;
+                        const amt = Number(it.amount) || 0;
+
+                        return (
+                          <tr key={idx2}>
+                            <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'center' }}>{idx2 + 1}</td>
+                            <td style={{ border: '1px solid #b45309', padding: 6, fontWeight: 600 }}>{it.description || 'Gold Ornament'}</td>
+                            <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'center', fontFamily: 'monospace' }}>{it.hsnCode || it.hsn_code || item.hsnSac || '7113'}</td>
+                            <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{nw ? nw.toFixed(3) + 'g' : '—'}</td>
+                            <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{wp ? wp + '%' : '—'}</td>
+                            <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{sw ? sw.toFixed(3) + 'g' : '—'}</td>
+                            <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{gross ? gross.toFixed(3) + 'g' : '—'}</td>
+                            <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{rate ? '₹' + rate.toLocaleString('en-IN') : '—'}</td>
+                            <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{making ? '₹' + making.toLocaleString('en-IN') : '—'}</td>
+                            <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{amt ? amt.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : item.taxableAmount.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                      {otherChg > 0 && (
+                        <tr>
+                          <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'center' }}>{itemsList.length + 1}</td>
+                          <td style={{ border: '1px solid #b45309', padding: 6 }} colSpan="8">Other Charges / Additions</td>
+                          <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{otherChg.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                      )}
+                      <tr style={{ fontWeight: 'bold' }}>
+                        <td colSpan="3" style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>Total Weight &amp; Subtotal:</td>
+                        <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{totalNetWt ? totalNetWt.toFixed(3) + 'g' : '—'}</td>
+                        <td style={{ border: '1px solid #b45309' }}></td>
+                        <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{totalStoneWt ? totalStoneWt.toFixed(3) + 'g' : '—'}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>{totalGrossWt ? totalGrossWt.toFixed(3) + 'g' : '—'}</td>
+                        <td colSpan="2" style={{ border: '1px solid #b45309' }}></td>
+                        <td style={{ border: '1px solid #b45309', padding: 6, textAlign: 'right' }}>₹{item.taxableAmount.toFixed(2)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div style={{ display: 'flex', gap: 12, marginBottom: 20, fontSize: 11 }}>
+                    <div style={{ flex: 1, border: '1px solid #b45309', padding: 10 }}>
+                      <strong>Amount Chargeable in Words:</strong>
+                      <div style={{ marginTop: 6, fontStyle: 'italic', fontWeight: 700 }}>{convertToWords(finalPayable)}</div>
+                    </div>
+                    <div style={{ width: 290 }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #b45309', fontSize: 11 }}>
+                        <tbody>
+                          <tr>
+                            <td style={{ border: '1px solid #b45309', padding: 4 }}>Subtotal Taxable</td>
+                            <td style={{ border: '1px solid #b45309', padding: 4, textAlign: 'right' }}>₹{item.taxableAmount.toFixed(2)}</td>
+                          </tr>
+                          <tr>
+                            <td style={{ border: '1px solid #b45309', padding: 4 }}>CGST ({rawInv?.cgstRate || 1.5}%)</td>
+                            <td style={{ border: '1px solid #b45309', padding: 4, textAlign: 'right' }}>₹{item.cgstAmount.toFixed(2)}</td>
+                          </tr>
+                          <tr>
+                            <td style={{ border: '1px solid #b45309', padding: 4 }}>SGST ({rawInv?.sgstRate || 1.5}%)</td>
+                            <td style={{ border: '1px solid #b45309', padding: 4, textAlign: 'right' }}>₹{item.sgstAmount.toFixed(2)}</td>
+                          </tr>
+                          <tr style={{ fontWeight: 'bold', background: '#fef3c7' }}>
+                            <td style={{ border: '1px solid #b45309', padding: 4 }}>Grand Total</td>
+                            <td style={{ border: '1px solid #b45309', padding: 4, textAlign: 'right' }}>₹{item.grandTotal.toFixed(2)}</td>
+                          </tr>
+                          {oldGoldAmt > 0 && (
+                            <>
+                              <tr>
+                                <td style={{ border: '1px solid #b45309', padding: 4, color: '#c00' }}>Old Gold Exchange (Deduction)</td>
+                                <td style={{ border: '1px solid #b45309', padding: 4, textAlign: 'right', color: '#c00' }}>
+                                  - ₹{oldGoldAmt.toFixed(2)}
+                                </td>
+                              </tr>
+                              <tr style={{ fontWeight: 'bold', background: '#fef3c7', fontSize: 12 }}>
+                                <td style={{ border: '1px solid #b45309', padding: 4 }}>Final Payable Amount</td>
+                                <td style={{ border: '1px solid #b45309', padding: 4, textAlign: 'right' }}>
+                                  ₹{finalPayable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                </td>
+                              </tr>
+                            </>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 18, fontSize: 12, border: '1px solid #b45309' }}>
+                    <thead>
+                      <tr style={{ background: '#fef3c7', borderBottom: '1px solid #b45309' }}>
+                        <th style={{ border: '1px solid #b45309', padding: 8, width: 35, textAlign: 'center' }}>S.N</th>
+                        <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'left' }}>Description of Work / Ornaments</th>
+                        <th style={{ border: '1px solid #b45309', padding: 8, width: 80, textAlign: 'center' }}>HSN</th>
+                        <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 110 }}>Marking Charge (₹)</th>
+                        <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 90 }}>CGST (2.5%)</th>
+                        <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 90 }}>SGST (2.5%)</th>
+                        <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 110 }}>Total Amount (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'center' }}>1</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, fontWeight: 600 }}>{rawJ?.product || rawJ?.ornament || 'Soldering & Engraving Work'}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'center' }}>7113</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{item.taxableAmount.toFixed(2)}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{item.cgstAmount.toFixed(2)}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{item.sgstAmount.toFixed(2)}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', fontWeight: 700 }}>₹{item.grandTotal.toFixed(2)}</td>
+                      </tr>
+                      <tr style={{ fontWeight: 'bold' }}>
+                        <td colSpan="3" style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>Subtotal &amp; Taxes:</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{item.taxableAmount.toFixed(2)}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{item.cgstAmount.toFixed(2)}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{item.sgstAmount.toFixed(2)}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{item.grandTotal.toFixed(2)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div style={{ display: 'flex', gap: 14, marginBottom: 20, fontSize: 12 }}>
+                    <div style={{ flex: 1, border: '1px solid #b45309', padding: 10 }}>
+                      <strong>Amount Chargeable in Words:</strong>
+                      <div style={{ marginTop: 6, fontStyle: 'italic', fontWeight: 700 }}>{convertToWords(item.grandTotal)}</div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 30, fontSize: 11 }}>
+                <div style={{ width: '60%' }}>
+                  <p style={{ margin: 0 }}><strong>Declaration:</strong></p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: 10, lineHeight: 1.4 }}>
+                    We declare that this invoice shows the actual price of the goods/services described and that all particulars are true and correct.
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right', width: '35%' }}>
+                  <p style={{ margin: 0 }}>For <strong>M S GOLD SMITH</strong></p>
+                  <p style={{ marginTop: 40, borderTop: '1px solid #b45309', display: 'inline-block', width: 140, paddingTop: 4, fontWeight: 700 }}>Authorised Signatory</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

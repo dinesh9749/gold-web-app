@@ -53,6 +53,35 @@ const getNextInvoiceSequence = (settingNo, existingInvoices = [], existingSolder
   return nextFromDb;
 };
 
+const convertToWords = (num) => {
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  const numString = (num || 0).toString();
+  const decimalParts = numString.split('.');
+  const rupees = parseInt(decimalParts[0]) || 0;
+  const paise = decimalParts.length > 1 ? parseInt(decimalParts[1].substring(0, 2).padEnd(2, '0')) : 0;
+
+  if (rupees === 0) return paise > 0 ? `Paise ${convertToWords(paise)} Only` : 'Zero Only';
+
+  function convertNumberToWords(n) {
+    if (n === 0) return '';
+    if (n < 20) return ones[n];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + ones[n % 10] : '');
+    if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' ' + convertNumberToWords(n % 100) : '');
+    if (n < 100000) return convertNumberToWords(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 !== 0 ? ' ' + convertNumberToWords(n % 1000) : '');
+    if (n < 10000000) return convertNumberToWords(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 !== 0 ? ' ' + convertNumberToWords(n % 100000) : '');
+    return convertNumberToWords(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 !== 0 ? ' ' + convertNumberToWords(n % 10000000) : '');
+  }
+
+  let result = `Rupees ${convertNumberToWords(rupees)}`;
+  if (paise > 0) {
+    result += ` and Paise ${convertNumberToWords(paise)}`;
+  }
+  return result + ' Only';
+};
+
 export default function MsSolderingEngraving() {
   const outletContext = useOutletContext();
   const isAdmin = true;
@@ -65,6 +94,7 @@ export default function MsSolderingEngraving() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [previewJob, setPreviewJob] = useState(null);
+  const [paperSize, setPaperSize] = useState('A4');
 
   // Form states
   const [formData, setFormData] = useState({
@@ -333,7 +363,7 @@ export default function MsSolderingEngraving() {
       </div>
 
       {/* ── NEW ORDER GENERATOR TAB ───────────────────────── */}
-      {activeTab === "generator" ? (
+      {activeTab === "generator" && (
         <div className="card" style={{ maxWidth: 640, margin: '0 auto', width: '100%' }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
@@ -475,24 +505,22 @@ export default function MsSolderingEngraving() {
             </div>
           </form>
         </div>
-      ) : (
-        /* ── HISTORY DIRECTORY LOG TAB ───────────────────────── */
-        <div className="card" style={{ width: '100%' }}>
-          <div className="section-header" style={{ marginBottom: 16 }}>
-            <span className="section-title">Soldering & Engraving Logs Directory</span>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{filteredJobs.length} total entries</span>
-          </div>
+      )}
 
-          {/* Search bar */}
-          <div style={{ marginBottom: 16, position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: 'var(--text-muted)' }}>🔍</span>
+      {/* ── TAB 2: HISTORY LIST ─────────────────────────────────── */}
+      {activeTab === "history" && (
+        <div className="card" style={{ padding: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--gold-300)', margin: 0 }}>
+              Soldering &amp; Repair Job Records
+            </h2>
             <input
               type="text"
               className="form-input"
-              style={{ paddingLeft: 36 }}
-              placeholder="Search past logs by Customer Name or Product..."
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="🔍 Search customer or product..."
+              style={{ maxWidth: 280, padding: '6px 12px', fontSize: 12 }}
             />
           </div>
 
@@ -571,20 +599,48 @@ export default function MsSolderingEngraving() {
         </div>
       )}
 
-      {/* ── 3-INCH THERMAL RECEIPT PRINT PREVIEW MODAL ────────── */}
+      {/* ── INVOICE / RECEIPT PRINT PREVIEW MODAL ────────── */}
       {showPreview && previewJob && (
         <div className="modal-overlay" style={{ zIndex: 11000 }}>
-          <div className="modal-box" style={{ maxWidth: 360, padding: 0 }}>
-            {/* Modal header (Hidden during actual print) */}
-            <div className="modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-              <div className="modal-title">✦ 3-Inch Thermal Receipt Preview</div>
+          <div className="modal-box" style={{ maxWidth: paperSize === 'A4' ? 880 : 380, padding: 0 }}>
+            {/* Modal header */}
+            <div className="modal-header" style={{ padding: '14px 20px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="modal-title" style={{ fontSize: 14, fontWeight: 700 }}>✦ Soldering Invoice Preview</div>
+                {/* Paper size switcher */}
+                <div style={{ display: 'flex', background: 'var(--bg-default)', padding: 3, borderRadius: 6, border: '1px solid var(--border-default)' }}>
+                  <button
+                    onClick={() => setPaperSize('A4')}
+                    style={{
+                      padding: '3px 10px', fontSize: 11, fontWeight: 700, border: 'none', borderRadius: 4,
+                      background: paperSize === 'A4' ? 'var(--gold-300)' : 'transparent',
+                      color: paperSize === 'A4' ? '#1e1b18' : 'var(--text-secondary)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📄 A4 Tax Invoice
+                  </button>
+                  <button
+                    onClick={() => setPaperSize('3-inch')}
+                    style={{
+                      padding: '3px 10px', fontSize: 11, fontWeight: 700, border: 'none', borderRadius: 4,
+                      background: paperSize === '3-inch' ? 'var(--gold-300)' : 'transparent',
+                      color: paperSize === '3-inch' ? '#1e1b18' : 'var(--text-secondary)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🧾 3-Inch Slip
+                  </button>
+                </div>
+              </div>
+
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={handlePrint}
                   className="btn-primary"
                   style={{ padding: '6px 14px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}
                 >
-                  <Printer size={13} /> Print
+                  <Printer size={13} /> Print ({paperSize})
                 </button>
                 <button
                   onClick={() => setShowPreview(false)}
@@ -594,142 +650,375 @@ export default function MsSolderingEngraving() {
               </div>
             </div>
 
-            {/* Receipt container (Simulates thermal receipt inside UI) */}
+            {/* Modal Body / Paper Container */}
             <div style={{
-              background: '#f9f9f9',
+              background: '#525659',
               padding: '24px 20px',
               display: 'flex',
               justifyContent: 'center',
-              alignItems: 'center'
+              alignItems: 'center',
+              maxHeight: '80vh',
+              overflowY: 'auto'
             }}>
-              {/* Paper Slip visual style */}
-              <div style={{
-                background: '#fffdf5',
-                color: '#0f172a',
-                width: '100%',
-                maxWidth: '280px',
-                padding: '14px 14px 8px',
-                boxShadow: '0 4px 20px rgba(217, 119, 6, 0.15)',
-                border: '1px solid var(--border-default)',
-                fontFamily: 'Courier New, Courier, monospace',
-                fontSize: '12px',
-                lineHeight: '1.3'
-              }}>
-                <div style={{ textAlign: 'center', marginBottom: 12 }}>
-                  <h2 style={{ margin: '0 0 3px 0', fontSize: 15, fontWeight: 'bold', letterSpacing: '0.5px' }}>M S GOLD SMITH</h2>
-                  <p style={{ margin: '2px 0', fontSize: 10 }}>No.37C, Chettiyakudi South Street, Nadaga Salai,</p>
-                  <p style={{ margin: '2px 0', fontSize: 10 }}>Srivilliputhur, Virudhunagar - 626 125.</p>
-                  <p style={{ margin: '2px 0', fontSize: 10 }}><strong>GSTIN:</strong> 33BDVPR1363J1Z2</p>
-                  <p style={{ margin: '2px 0', fontSize: 10 }}><strong>Mobile:</strong> 94431 12034</p>
-                  <div style={{ margin: '8px 0 6px 0', borderBottom: '1px dashed #b45309' }} />
-                  <h3 style={{ margin: '0', fontSize: 12, fontWeight: 'bold', letterSpacing: '1px' }}>SOLDERING &amp; ENGRAVING</h3>
+              {paperSize === 'A4' ? (
+                /* A4 Tax Invoice Format */
+                <div style={{
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  width: '100%',
+                  maxWidth: '750px',
+                  padding: '32px 36px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                  borderRadius: 4,
+                  fontFamily: 'sans-serif',
+                  fontSize: '12px',
+                  lineHeight: '1.4'
+                }}>
+                  {/* Header */}
+                  <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                    <h2 style={{ margin: '0 0 4px 0', fontSize: 24, letterSpacing: 0.5, fontWeight: 800, color: '#0f172a' }}>M S GOLD SMITH</h2>
+                    <p style={{ margin: '2px 0', fontSize: 12, color: '#334155' }}>No.37C, Chettiyakudi South Street, Nadaga Salai,</p>
+                    <p style={{ margin: '2px 0', fontSize: 12, color: '#334155' }}>Srivilliputhur, Virudhunagar - 626 125.</p>
+                    <p style={{ margin: '2px 0', fontSize: 12, color: '#334155' }}><strong>GSTIN:</strong> 33BDVPR1363J1Z2 | <strong>Mobile:</strong> 94431 12034</p>
+                    <h3 style={{ margin: '14px 0 4px 0', fontSize: 15, textDecoration: 'underline', fontWeight: 700, color: '#0f172a' }}>TAX INVOICE</h3>
+                    <span style={{ fontSize: 11, fontStyle: 'italic', color: '#64748b' }}>Original for Recipient</span>
+                  </div>
+
+                  {/* Consignee & Details Box */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', border: '1px solid #b45309', padding: 12, marginBottom: 20, fontSize: 12, background: '#fffdf5' }}>
+                    <div>
+                      <strong>Consignee Details:</strong>
+                      <div style={{ marginTop: 4, fontWeight: 700, fontSize: 13 }}>{previewJob.customerName || 'Walk-in Customer'}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div><strong>Invoice No:</strong> <span style={{ fontWeight: 700, color: '#b45309' }}>{previewJob.invoiceNo || previewJob.receiptNo}</span></div>
+                      <div><strong>Date:</strong> {previewJob.date}</div>
+                      <div><strong>Service Type:</strong> Soldering &amp; Engraving</div>
+                    </div>
+                  </div>
+
+                  {/* Items Table */}
+                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20, fontSize: 12, border: '1px solid #b45309' }}>
+                    <thead>
+                      <tr style={{ background: '#fef3c7', borderBottom: '1px solid #b45309' }}>
+                        <th style={{ border: '1px solid #b45309', padding: 8, width: 35, textAlign: 'center' }}>S.N</th>
+                        <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'left' }}>Description of Work / Ornaments</th>
+                        <th style={{ border: '1px solid #b45309', padding: 8, width: 80, textAlign: 'center' }}>HSN</th>
+                        <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 110 }}>Marking Charge (₹)</th>
+                        <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 90 }}>CGST (2.5%)</th>
+                        <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 90 }}>SGST (2.5%)</th>
+                        <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 110 }}>Total Amount (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const marking = Number(previewJob.markingCharges) || 0;
+                        const gst = Number(previewJob.gstAmount) || (marking * 0.05);
+                        const cgst = gst / 2;
+                        const sgst = gst / 2;
+                        const total = Number(previewJob.totalAmount) || (marking + gst);
+
+                        return (
+                          <>
+                            <tr>
+                              <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'center' }}>1</td>
+                              <td style={{ border: '1px solid #b45309', padding: 8, fontWeight: 600 }}>{previewJob.product || 'Soldering & Engraving Work'}</td>
+                              <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'center', fontFamily: 'monospace' }}>7113</td>
+                              <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{marking.toFixed(2)}</td>
+                              <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{cgst.toFixed(2)}</td>
+                              <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{sgst.toFixed(2)}</td>
+                              <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', fontWeight: 700 }}>₹{total.toFixed(2)}</td>
+                            </tr>
+                            <tr style={{ fontWeight: 'bold', background: '#fffdf5' }}>
+                              <td colSpan="3" style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>Subtotal &amp; Taxes:</td>
+                              <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{marking.toFixed(2)}</td>
+                              <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{cgst.toFixed(2)}</td>
+                              <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{sgst.toFixed(2)}</td>
+                              <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', color: '#b45309', fontSize: 13 }}>₹{total.toFixed(2)}</td>
+                            </tr>
+                          </>
+                        );
+                      })()}
+                    </tbody>
+                  </table>
+
+                  {/* Words & Summary */}
+                  <div style={{ display: 'flex', gap: 14, marginBottom: 24, fontSize: 12 }}>
+                    <div style={{ flex: 1, border: '1px solid #b45309', padding: 12, background: '#fffdf5' }}>
+                      <strong>Amount Chargeable in Words:</strong>
+                      <div style={{ marginTop: 6, fontStyle: 'italic', fontWeight: 700, color: '#0f172a' }}>
+                        {convertToWords(Number(previewJob.totalAmount) || 0)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Declarations & Signature */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 36, fontSize: 12 }}>
+                    <div style={{ width: '60%' }}>
+                      <p style={{ margin: 0 }}><strong>Declaration:</strong></p>
+                      <p style={{ margin: '4px 0 0 0', fontSize: 10, lineHeight: 1.4, color: '#475569' }}>
+                        We declare that this invoice shows the actual price of the services described and that all particulars are true and correct.
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right', width: '35%' }}>
+                      <p style={{ margin: 0 }}>For <strong>M S GOLD SMITH</strong></p>
+                      <p style={{ marginTop: 45, borderTop: '1px solid #b45309', display: 'inline-block', width: 150, paddingTop: 4, fontWeight: 700 }}>Authorised Signatory</p>
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                /* 3-Inch Thermal Slip */
+                <div style={{
+                  background: '#fffdf5',
+                  color: '#0f172a',
+                  width: '100%',
+                  maxWidth: '280px',
+                  padding: '14px 14px 8px',
+                  boxShadow: '0 4px 20px rgba(217, 119, 6, 0.15)',
+                  border: '1px solid var(--border-default)',
+                  fontFamily: 'Courier New, Courier, monospace',
+                  fontSize: '12px',
+                  lineHeight: '1.3'
+                }}>
+                  <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                    <h2 style={{ margin: '0 0 3px 0', fontSize: 15, fontWeight: 'bold', letterSpacing: '0.5px' }}>M S GOLD SMITH</h2>
+                    <p style={{ margin: '2px 0', fontSize: 10 }}>No.37C, Chettiyakudi South Street, Nadaga Salai,</p>
+                    <p style={{ margin: '2px 0', fontSize: 10 }}>Srivilliputhur, Virudhunagar - 626 125.</p>
+                    <p style={{ margin: '2px 0', fontSize: 10 }}><strong>GSTIN:</strong> 33BDVPR1363J1Z2</p>
+                    <p style={{ margin: '2px 0', fontSize: 10 }}><strong>Mobile:</strong> 94431 12034</p>
+                    <div style={{ margin: '8px 0 6px 0', borderBottom: '1px dashed #b45309' }} />
+                    <h3 style={{ margin: '0', fontSize: 12, fontWeight: 'bold', letterSpacing: '1px' }}>SOLDERING &amp; ENGRAVING</h3>
+                  </div>
 
-                <div style={{ fontSize: 10, display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 10 }}>
-                  <div><strong>Invoice No:</strong> {previewJob.invoiceNo || previewJob.receiptNo}</div>
-                  <div><strong>Date:</strong> {previewJob.date}</div>
-                  <div><strong>Customer:</strong> {previewJob.customerName}</div>
+                  <div style={{ fontSize: 10, display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 10 }}>
+                    <div><strong>Invoice No:</strong> {previewJob.invoiceNo || previewJob.receiptNo}</div>
+                    <div><strong>Date:</strong> {previewJob.date}</div>
+                    <div><strong>Customer:</strong> {previewJob.customerName}</div>
+                  </div>
+
+                  <div style={{ borderBottom: '1px dashed #b45309', marginBottom: 8 }} />
+
+                  <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginBottom: 8 }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px dashed #b45309' }}>
+                        <th style={{ textAlign: 'left', paddingBottom: 4 }}>Description</th>
+                        <th style={{ textAlign: 'right', paddingBottom: 4 }}>Amount (₹)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style={{ paddingTop: 6, paddingBottom: 4, verticalAlign: 'top' }}>
+                          {previewJob.product} (HSN 7113)
+                        </td>
+                        <td style={{ paddingTop: 6, paddingBottom: 4, textAlign: 'right', verticalAlign: 'top' }}>
+                          {(Number(previewJob.markingCharges) || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ paddingTop: 3, paddingBottom: 3, color: '#334155' }}>GST (5%)</td>
+                        <td style={{ paddingTop: 3, paddingBottom: 3, textAlign: 'right' }}>{(Number(previewJob.gstAmount) || 0).toFixed(2)}</td>
+                      </tr>
+                      <tr style={{ fontWeight: 'bold', borderTop: '1px dashed #b45309' }}>
+                        <td style={{ paddingTop: 6 }}>Net Amount</td>
+                        <td style={{ paddingTop: 6, textAlign: 'right', fontSize: 13 }}>
+                          ₹{(Number(previewJob.totalAmount) || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div style={{ borderBottom: '1px dashed #b45309', marginTop: 6, marginBottom: 6 }} />
+
+                  <div style={{ textAlign: 'center', fontSize: 9 }}>
+                    <p style={{ margin: '1px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
+                  </div>
                 </div>
-
-                <div style={{ borderBottom: '1px dashed #b45309', marginBottom: 8 }} />
-
-                <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginBottom: 8 }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px dashed #b45309' }}>
-                      <th style={{ textAlign: 'left', paddingBottom: 4 }}>Description</th>
-                      <th style={{ textAlign: 'right', paddingBottom: 4 }}>Amount (₹)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td style={{ paddingTop: 6, paddingBottom: 4, verticalAlign: 'top' }}>
-                        {previewJob.product}
-                      </td>
-                      <td style={{ paddingTop: 6, paddingBottom: 4, textAlign: 'right', verticalAlign: 'top' }}>
-                        {(Number(previewJob.markingCharges) || 0).toFixed(2)}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style={{ paddingTop: 3, paddingBottom: 3, color: '#334155' }}>GST (5%)</td>
-                      <td style={{ paddingTop: 3, paddingBottom: 3, textAlign: 'right' }}>{(Number(previewJob.gstAmount) || 0).toFixed(2)}</td>
-                    </tr>
-                    <tr style={{ fontWeight: 'bold', borderTop: '1px dashed #b45309' }}>
-                      <td style={{ paddingTop: 6 }}>Net Amount</td>
-                      <td style={{ paddingTop: 6, textAlign: 'right', fontSize: 13 }}>
-                        ₹{(Number(previewJob.totalAmount) || 0).toFixed(2)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                <div style={{ borderBottom: '1px dashed #b45309', marginTop: 6, marginBottom: 6 }} />
-
-                <div style={{ textAlign: 'center', fontSize: 9 }}>
-                  <p style={{ margin: '1px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
-
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* ── DYNAMIC PRINTER ELEMENT FOR THERMAL RECEIPT ─────────── */}
+      {/* ── DYNAMIC PRINTER ELEMENT FOR SOLDERING INVOICE ─────────── */}
+      <style>{`
+        @page {
+          size: A4 portrait;
+          margin: 0mm;
+        }
+        @media screen {
+          .printable-invoice, .thermal-receipt-print {
+            display: none !important;
+          }
+        }
+        @media print {
+          html, body {
+            width: 210mm !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          .printable-invoice, .printable-invoice *,
+          .thermal-receipt-print, .thermal-receipt-print * {
+            visibility: visible !important;
+          }
+          .printable-invoice {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 210mm !important;
+            max-width: 210mm !important;
+            box-sizing: border-box !important;
+            padding: 10mm 12mm !important;
+            margin: 0 !important;
+          }
+        }
+      `}</style>
       {previewJob && (
-        <div className="thermal-receipt-print" style={{ fontWeight: 'bold' }}>
-          <div style={{ textAlign: 'center', marginBottom: 10 }}>
-            <h2 style={{ margin: '0 0 2px 0', fontSize: 14, fontWeight: 'bold' }}>M S GOLD SMITH</h2>
-            <p className="address-text" style={{ margin: '1px 0', fontSize: 9, fontWeight: 'normal' }}>No.37C, Chettiyakudi South Street, Nadaga Salai,</p>
-            <p className="address-text" style={{ margin: '1px 0', fontSize: 9, fontWeight: 'normal' }}>Srivilliputhur, Virudhunagar - 626 125.</p>
-            <p className="address-text" style={{ margin: '1px 0', fontSize: 9, fontWeight: 'normal' }}>GSTIN: 33BDVPR1363J1Z2 | Ph: 94431 12034</p>
-            <div style={{ margin: '6px 0', borderBottom: '1px dashed #000' }} />
-            <h3 style={{ margin: '0', fontSize: 11, fontWeight: 'bold' }}>SOLDERING &amp; ENGRAVING RECEIPT</h3>
+        paperSize === 'A4' ? (
+          <div className="printable-invoice paper-a4" style={{ fontWeight: 'normal' }}>
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <h2 style={{ margin: '0 0 4px 0', fontSize: 24, letterSpacing: 0.5, fontWeight: 800 }}>M S GOLD SMITH</h2>
+              <p style={{ margin: '2px 0', fontSize: 12 }}>No.37C, Chettiyakudi South Street, Nadaga Salai,</p>
+              <p style={{ margin: '2px 0', fontSize: 12 }}>Srivilliputhur, Virudhunagar - 626 125.</p>
+              <p style={{ margin: '2px 0', fontSize: 12 }}><strong>GSTIN:</strong> 33BDVPR1363J1Z2 | <strong>Mobile:</strong> 94431 12034</p>
+              <h3 style={{ margin: '14px 0 6px 0', fontSize: 15, textDecoration: 'underline', fontWeight: 700 }}>TAX INVOICE</h3>
+              <span style={{ fontSize: 11, fontStyle: 'italic' }}>Original for Recipient</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', border: '1px solid #b45309', padding: 12, marginBottom: 20, fontSize: 12 }}>
+              <div>
+                <strong>Consignee Details:</strong>
+                <div style={{ marginTop: 4, fontWeight: 700 }}>{previewJob.customerName || 'Walk-in Customer'}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div><strong>Invoice No:</strong> {previewJob.invoiceNo || previewJob.receiptNo}</div>
+                <div><strong>Date:</strong> {previewJob.date}</div>
+              </div>
+            </div>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 20, fontSize: 12, border: '1px solid #b45309' }}>
+              <thead>
+                <tr style={{ background: '#fef3c7', borderBottom: '1px solid #b45309' }}>
+                  <th style={{ border: '1px solid #b45309', padding: 8, width: 35, textAlign: 'center' }}>S.N</th>
+                  <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'left' }}>Description of Work / Ornaments</th>
+                  <th style={{ border: '1px solid #b45309', padding: 8, width: 80, textAlign: 'center' }}>HSN</th>
+                  <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 110 }}>Marking Charge (₹)</th>
+                  <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 90 }}>CGST (2.5%)</th>
+                  <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 90 }}>SGST (2.5%)</th>
+                  <th style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', width: 110 }}>Total Amount (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const marking = Number(previewJob.markingCharges) || 0;
+                  const gst = Number(previewJob.gstAmount) || (marking * 0.05);
+                  const cgst = gst / 2;
+                  const sgst = gst / 2;
+                  const total = Number(previewJob.totalAmount) || (marking + gst);
+                  return (
+                    <>
+                      <tr>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'center' }}>1</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, fontWeight: 600 }}>{previewJob.product || 'Soldering & Engraving Work'}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'center' }}>7113</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{marking.toFixed(2)}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{cgst.toFixed(2)}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{sgst.toFixed(2)}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right', fontWeight: 700 }}>₹{total.toFixed(2)}</td>
+                      </tr>
+                      <tr style={{ fontWeight: 'bold' }}>
+                        <td colSpan="3" style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>Subtotal &amp; Taxes:</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{marking.toFixed(2)}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{cgst.toFixed(2)}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{sgst.toFixed(2)}</td>
+                        <td style={{ border: '1px solid #b45309', padding: 8, textAlign: 'right' }}>₹{total.toFixed(2)}</td>
+                      </tr>
+                    </>
+                  );
+                })()}
+              </tbody>
+            </table>
+
+            <div style={{ display: 'flex', gap: 14, marginBottom: 24, fontSize: 12 }}>
+              <div style={{ flex: 1, border: '1px solid #b45309', padding: 12 }}>
+                <strong>Amount Chargeable in Words:</strong>
+                <div style={{ marginTop: 6, fontStyle: 'italic', fontWeight: 700 }}>
+                  {convertToWords(Number(previewJob.totalAmount) || 0)}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 36, fontSize: 12 }}>
+              <div style={{ width: '60%' }}>
+                <p style={{ margin: 0 }}><strong>Declaration:</strong></p>
+                <p style={{ margin: '4px 0 0 0', fontSize: 10, lineHeight: 1.4 }}>
+                  We declare that this invoice shows the actual price of the services described and that all particulars are true and correct.
+                </p>
+              </div>
+              <div style={{ textAlign: 'right', width: '35%' }}>
+                <p style={{ margin: 0 }}>For <strong>M S GOLD SMITH</strong></p>
+                <p style={{ marginTop: 45, borderTop: '1px solid #b45309', display: 'inline-block', width: 150, paddingTop: 4 }}>Authorised Signatory</p>
+              </div>
+            </div>
           </div>
+        ) : (
+          <div className="thermal-receipt-print" style={{ fontWeight: 'bold' }}>
+            <div style={{ textAlign: 'center', marginBottom: 10 }}>
+              <h2 style={{ margin: '0 0 2px 0', fontSize: 14, fontWeight: 'bold' }}>M S GOLD SMITH</h2>
+              <p className="address-text" style={{ margin: '1px 0', fontSize: 9, fontWeight: 'normal' }}>No.37C, Chettiyakudi South Street, Nadaga Salai,</p>
+              <p className="address-text" style={{ margin: '1px 0', fontSize: 9, fontWeight: 'normal' }}>Srivilliputhur, Virudhunagar - 626 125.</p>
+              <p className="address-text" style={{ margin: '1px 0', fontSize: 9, fontWeight: 'normal' }}>GSTIN: 33BDVPR1363J1Z2 | Ph: 94431 12034</p>
+              <div style={{ margin: '6px 0', borderBottom: '1px dashed #000' }} />
+              <h3 style={{ margin: '0', fontSize: 11, fontWeight: 'bold' }}>SOLDERING &amp; ENGRAVING RECEIPT</h3>
+            </div>
 
-          <div style={{ fontSize: 10, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 2, fontWeight: 'bold' }}>
-            <div><strong>Invoice No:</strong> {previewJob.invoiceNo || previewJob.receiptNo}</div>
-            <div><strong>Date:</strong> {previewJob.date}</div>
-            <div><strong>Customer:</strong> {previewJob.customerName}</div>
+            <div style={{ fontSize: 10, marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 2, fontWeight: 'bold' }}>
+              <div><strong>Invoice No:</strong> {previewJob.invoiceNo || previewJob.receiptNo}</div>
+              <div><strong>Date:</strong> {previewJob.date}</div>
+              <div><strong>Customer:</strong> {previewJob.customerName}</div>
+            </div>
+
+            <div style={{ borderBottom: '1px dashed #000', marginBottom: 8 }} />
+
+            <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse', marginBottom: 8, fontWeight: 'bold' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px dashed #000' }}>
+                  <th style={{ textAlign: 'left', paddingBottom: 4, fontWeight: 'bold' }}>Description</th>
+                  <th style={{ textAlign: 'right', paddingBottom: 4, fontWeight: 'bold' }}>Amount (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ fontWeight: 'bold' }}>
+                  <td style={{ paddingTop: 6, paddingBottom: 4, verticalAlign: 'top', fontWeight: 'bold' }}>{previewJob.product} (HSN 7113)</td>
+                  <td style={{ paddingTop: 6, paddingBottom: 4, textAlign: 'right', verticalAlign: 'top', fontWeight: 'bold' }}>
+                    {(Number(previewJob.markingCharges) || 0).toFixed(2)}
+                  </td>
+                </tr>
+                <tr style={{ fontWeight: 'bold' }}>
+                  <td style={{ paddingTop: 2, paddingBottom: 2, color: '#000', fontWeight: 'bold' }}>GST (5%)</td>
+                  <td style={{ paddingTop: 2, paddingBottom: 2, textAlign: 'right', fontWeight: 'bold' }}>
+                    {(Number(previewJob.gstAmount) || 0).toFixed(2)}
+                  </td>
+                </tr>
+                <tr style={{ fontWeight: 'bold', borderTop: '1px dashed #000' }}>
+                  <td style={{ paddingTop: 6, fontWeight: 'bold' }}>Net Total</td>
+                  <td style={{ paddingTop: 6, textAlign: 'right', fontSize: 12, fontWeight: 'bold' }}>
+                    ₹{(Number(previewJob.totalAmount) || 0).toFixed(2)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div style={{ borderBottom: '1px dashed #000', marginTop: 6, marginBottom: 6 }} />
+
+            <div style={{ textAlign: 'center', fontSize: 9, fontWeight: 'bold' }}>
+              <p style={{ margin: '1px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
+            </div>
           </div>
-
-          <div style={{ borderBottom: '1px dashed #000', marginBottom: 8 }} />
-
-          <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse', marginBottom: 8, fontWeight: 'bold' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px dashed #000' }}>
-                <th style={{ textAlign: 'left', paddingBottom: 4, fontWeight: 'bold' }}>Description</th>
-                <th style={{ textAlign: 'right', paddingBottom: 4, fontWeight: 'bold' }}>Amount (₹)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr style={{ fontWeight: 'bold' }}>
-                <td style={{ paddingTop: 6, paddingBottom: 4, verticalAlign: 'top', fontWeight: 'bold' }}>{previewJob.product}</td>
-                <td style={{ paddingTop: 6, paddingBottom: 4, textAlign: 'right', verticalAlign: 'top', fontWeight: 'bold' }}>
-                  {(Number(previewJob.markingCharges) || 0).toFixed(2)}
-                </td>
-              </tr>
-              <tr style={{ fontWeight: 'bold' }}>
-                <td style={{ paddingTop: 2, paddingBottom: 2, color: '#000', fontWeight: 'bold' }}>GST (5%)</td>
-                <td style={{ paddingTop: 2, paddingBottom: 2, textAlign: 'right', fontWeight: 'bold' }}>
-                  {(Number(previewJob.gstAmount) || 0).toFixed(2)}
-                </td>
-              </tr>
-              <tr style={{ fontWeight: 'bold', borderTop: '1px dashed #000' }}>
-                <td style={{ paddingTop: 6, fontWeight: 'bold' }}>Net Total</td>
-                <td style={{ paddingTop: 6, textAlign: 'right', fontSize: 12, fontWeight: 'bold' }}>
-                  ₹{(Number(previewJob.totalAmount) || 0).toFixed(2)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div style={{ borderBottom: '1px dashed #000', marginTop: 6, marginBottom: 6 }} />
-
-          <div style={{ textAlign: 'center', fontSize: 9, fontWeight: 'bold' }}>
-            <p style={{ margin: '1px 0', fontWeight: 'bold' }}>Thank you! Visit again!</p>
-
-          </div>
-        </div>
+        )
       )}
     </div>
   );

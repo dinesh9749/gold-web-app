@@ -853,7 +853,7 @@ export const supabaseAPI = {
   getAllInvoices: async () => {
     const { data, error } = await supabase
       .from('invoices')
-      .select('*')
+      .select('*, invoice_items(*)')
       .eq('org_id', getActiveOrgId())
       .order('date', { ascending: false })
       .order('created_at', { ascending: false });
@@ -875,7 +875,19 @@ export const supabaseAPI = {
       finalAmount: row.final_amount,
       otherCharges: parseFloat(row.other_charges) || 0,
       productPhoto: row.product_photo || null,
-      createdAt: row.created_at
+      createdAt: row.created_at,
+      items: (row.invoice_items || []).map(item => ({
+        id: item.id,
+        invoiceId: item.invoice_id,
+        description: item.description,
+        hsnCode: item.hsn_code,
+        netWeight: item.net_weight,
+        wastagePct: item.wastage_pct,
+        stoneWeight: item.stone_weight || 0,
+        makingCharges: item.making_charges,
+        ratePerGram: item.rate_per_gram,
+        amount: item.amount
+      }))
     }));
   },
 
