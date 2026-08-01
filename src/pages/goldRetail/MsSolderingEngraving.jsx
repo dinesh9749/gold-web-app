@@ -842,7 +842,7 @@ export default function MsSolderingEngraving() {
       {/* ── DYNAMIC PRINTER ELEMENT FOR SOLDERING INVOICE ─────────── */}
       <style>{`
         @page {
-          size: A4 portrait;
+          size: ${paperSize === 'A4' ? 'A4 portrait' : '76mm auto'};
           margin: 0mm;
         }
         @media screen {
@@ -852,10 +852,11 @@ export default function MsSolderingEngraving() {
         }
         @media print {
           html, body {
-            width: 210mm !important;
+            width: ${paperSize === 'A4' ? '210mm !important' : 'auto !important'};
             margin: 0 !important;
             padding: 0 !important;
             background: #ffffff !important;
+            ${paperSize === '3-inch' ? 'min-height: 0 !important; height: auto !important; max-height: fit-content !important; overflow: hidden !important;' : ''}
           }
           body * {
             visibility: hidden !important;
@@ -864,16 +865,54 @@ export default function MsSolderingEngraving() {
           .thermal-receipt-print, .thermal-receipt-print * {
             visibility: visible !important;
           }
-          .printable-invoice {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 210mm !important;
-            max-width: 210mm !important;
-            box-sizing: border-box !important;
-            padding: 10mm 12mm !important;
-            margin: 0 !important;
-          }
+          ${paperSize === 'A4' ? `
+            .printable-invoice {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 210mm !important;
+              max-width: 210mm !important;
+              box-sizing: border-box !important;
+              padding: 10mm 12mm !important;
+              margin: 0 !important;
+            }
+          ` : `
+            html, body, #root, #root > div {
+              height: auto !important;
+              min-height: 0 !important;
+              max-height: max-content !important;
+              overflow: hidden !important;
+            }
+            .thermal-receipt-print {
+              display: block !important;
+              position: absolute !important;
+              top: 0 !important;
+              left: 0 !important;
+              width: 100% !important;
+              max-width: 76mm !important;
+              height: auto !important;
+              max-height: fit-content !important;
+              margin: 0 !important;
+              padding: 2mm 3mm 1mm 5mm !important;
+              box-sizing: border-box !important;
+              word-break: break-word !important;
+              overflow-wrap: break-word !important;
+              font-family: 'Courier New', Courier, monospace !important;
+              font-size: 11px !important;
+              font-weight: bold !important;
+              line-height: 1.3 !important;
+              color: #000000 !important;
+              background: #ffffff !important;
+              z-index: 999999 !important;
+              page-break-after: avoid !important;
+              break-after: avoid !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+            .thermal-receipt-print .address-text {
+              font-weight: normal !important;
+            }
+          `}
         }
       `}</style>
       {previewJob && (
