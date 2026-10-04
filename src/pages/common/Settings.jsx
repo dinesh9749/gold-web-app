@@ -27,7 +27,7 @@ export default function Settings() {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       const res = await api.getOrganizationSettings();
       if (res) {
         setNextInvoiceNo(res.next_invoice_number || 'INV-1001');
@@ -46,7 +46,7 @@ export default function Settings() {
 
   const loadMasterLocationData = async () => {
     try {
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       const [stList, ctList] = await Promise.all([
         api.getAllStates ? api.getAllStates() : [],
         api.getAllCities ? api.getAllCities() : []
@@ -68,7 +68,7 @@ export default function Settings() {
     setErrorMessage('');
     setSuccessMessage('');
     try {
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       const ok = await api.updateOrganizationSettings(
         nextInvoiceNo.trim(),
         nextReceiptNo.trim()
@@ -93,7 +93,7 @@ export default function Settings() {
     if (!newStateName.trim()) return;
     setAddingState(true);
     try {
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       await api.addState(newStateName.trim(), newStateCode.trim().toUpperCase());
       setNewStateName('');
       setNewStateCode('');
@@ -111,7 +111,7 @@ export default function Settings() {
   const handleDeleteState = async (id, name) => {
     if (!window.confirm(`Remove state "${name}"?`)) return;
     try {
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       await api.deleteState(id);
       setSuccessMessage(`State "${name}" removed.`);
       await loadMasterLocationData();
@@ -128,7 +128,7 @@ export default function Settings() {
     if (!newCityName.trim()) return;
     setAddingCity(true);
     try {
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       await api.addCity(newCityName.trim(), newCityState.trim());
       setNewCityName('');
       setNewCityState('');
@@ -146,7 +146,7 @@ export default function Settings() {
   const handleDeleteCity = async (id, name) => {
     if (!window.confirm(`Remove city "${name}"?`)) return;
     try {
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       await api.deleteCity(id);
       setSuccessMessage(`City "${name}" removed.`);
       await loadMasterLocationData();

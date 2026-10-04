@@ -132,7 +132,7 @@ const Invoice = () => {
 
   const loadData = async () => {
     try {
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       // Load customers safely
       let custRes = [];
       try {
@@ -194,7 +194,7 @@ const Invoice = () => {
   const loadInvoicesHistory = async () => {
     try {
       setHistoryLoading(true);
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       const res = api?.getAllInvoices ? await api.getAllInvoices() : [];
       if (Array.isArray(res)) setInvoices(res);
       else setInvoices([]);
@@ -209,7 +209,7 @@ const Invoice = () => {
   const handleClosePreview = async () => {
     setShowPreview(false);
     if (!invoiceData.id) {
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       const freshInvoices = (api?.getAllInvoices ? await api.getAllInvoices() : null) || (Array.isArray(invoices) ? invoices : []);
       const freshSoldering = api?.getAllSolderingJobs ? await api.getAllSolderingJobs() : [];
       const settingsRes = api?.getOrganizationSettings ? await api.getOrganizationSettings() : null;
@@ -246,7 +246,7 @@ const Invoice = () => {
 
   const handleReloadSequence = async () => {
     try {
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       const [settingsRes, invRes, soldRes] = await Promise.all([
         api?.getOrganizationSettings ? api.getOrganizationSettings() : Promise.resolve(null),
         api?.getAllInvoices ? api.getAllInvoices() : Promise.resolve([]),
@@ -325,7 +325,7 @@ const Invoice = () => {
         photos.push(base64Photo);
         const stringified = JSON.stringify(photos);
 
-        const api = window.electronAPI || supabaseAPI;
+        const api = supabaseAPI;
         if (api?.updateInvoicePhoto) {
           await api.updateInvoicePhoto(invoiceId, stringified);
         }
@@ -376,7 +376,7 @@ const Invoice = () => {
       photos.splice(indexToDelete, 1);
       const stringified = photos.length > 0 ? JSON.stringify(photos) : null;
 
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       if (api?.updateInvoicePhoto) {
         await api.updateInvoicePhoto(invoiceId, stringified);
       }
@@ -531,7 +531,7 @@ const Invoice = () => {
         }))
       };
 
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       const res = api?.saveInvoice ? await api.saveInvoice(payload) : null;
       if (res?.id) {
         const actualInvoiceNo = res.invoiceNo || payload.invoiceNo;
@@ -557,18 +557,13 @@ const Invoice = () => {
   };
 
   const handlePrint = () => {
-    const printContent = document.getElementById("invoice-preview");
-    const originalContents = document.body.innerHTML;
-    document.body.innerHTML = printContent.outerHTML;
     window.print();
-    document.body.innerHTML = originalContents;
-    window.location.reload();
   };
 
   const handleDeleteInvoice = async (id) => {
     if (window.confirm("Are you sure you want to delete this invoice permanently?")) {
       try {
-        const api = window.electronAPI || supabaseAPI;
+        const api = supabaseAPI;
         if (api?.deleteInvoice) {
           await api.deleteInvoice(id);
         }
@@ -582,7 +577,7 @@ const Invoice = () => {
 
   const handleLoadInvoiceDetails = async (id) => {
     try {
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       const res = api?.getInvoiceById ? await api.getInvoiceById(id) : null;
       if (res) {
         // Map back to input model
@@ -1194,6 +1189,18 @@ const Invoice = () => {
                       margin: 0 !important;
                       padding: 0 !important;
                       visibility: hidden;
+                    }
+                    #invoice-preview, #invoice-preview * {
+                      visibility: visible !important;
+                    }
+                    #invoice-preview {
+                      position: absolute !important;
+                      left: 0 !important;
+                      top: 0 !important;
+                      width: 100% !important;
+                      margin: 0 !important;
+                      background: #ffffff !important;
+                      z-index: 999999 !important;
                     }
                     .paper-a4 {
                       width: 100% !important;

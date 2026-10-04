@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { supabaseAPI } from '../../db/supabaseAPI';
 
 const CustomerViewPage = () => {
   const outletContext = useOutletContext();
@@ -30,8 +31,8 @@ const CustomerViewPage = () => {
   const loadLocations = async () => {
     try {
       const [stList, ctList] = await Promise.all([
-        window.electronAPI?.getAllStates ? window.electronAPI.getAllStates() : [],
-        window.electronAPI?.getAllCities ? window.electronAPI.getAllCities() : []
+        supabaseAPI.getAllStates ? supabaseAPI.getAllStates() : [],
+        supabaseAPI.getAllCities ? supabaseAPI.getAllCities() : []
       ]);
       if (stList && stList.length > 0) {
         setStates(stList.map(s => typeof s === 'object' ? s.name : s));
@@ -47,7 +48,7 @@ const CustomerViewPage = () => {
   const loadCustomers = async () => {
     try {
       setLoading(true);
-      const response = await window.electronAPI?.getAllCustomers();
+      const response = await supabaseAPI.getAllCustomers();
       if (response) setCustomers(response);
     } catch (error) {
       console.error('Error loading customers:', error);
@@ -74,7 +75,7 @@ const CustomerViewPage = () => {
     }
     try {
       setSubmitting(true);
-      const response = await window.electronAPI?.saveCustomer(formData);
+      const response = await supabaseAPI.saveCustomer(formData);
       if (response?.id) {
         await loadCustomers();
         resetForm();
@@ -90,7 +91,7 @@ const CustomerViewPage = () => {
   const handleDeleteCustomer = async (id) => {
     if (window.confirm('Delete this customer?')) {
       try {
-        await window.electronAPI?.deleteCustomer(id);
+        await supabaseAPI.deleteCustomer(id);
         setCustomers(prev => prev.filter(c => c.id !== id));
       } catch (error) {
         console.error(error);
@@ -104,8 +105,8 @@ const CustomerViewPage = () => {
       setCities(prev => [...prev, cityName]);
       setFormData(prev => ({ ...prev, city: cityName }));
       try {
-        if (window.electronAPI?.addCity) {
-          await window.electronAPI.addCity(cityName, formData.state || '');
+        if (supabaseAPI.addCity) {
+          await supabaseAPI.addCity(cityName, formData.state || '');
         }
       } catch (e) {
         console.error("Error adding city:", e);
@@ -121,8 +122,8 @@ const CustomerViewPage = () => {
       setStates(prev => [...prev, stateName]);
       setFormData(prev => ({ ...prev, state: stateName }));
       try {
-        if (window.electronAPI?.addState) {
-          await window.electronAPI.addState(stateName, '');
+        if (supabaseAPI.addState) {
+          await supabaseAPI.addState(stateName, '');
         }
       } catch (e) {
         console.error("Error adding state:", e);

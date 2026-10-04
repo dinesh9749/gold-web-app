@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { supabaseAPI } from '../../db/supabaseAPI';
 
 function MsDigiGold() {
   const outletContext = useOutletContext();
@@ -54,17 +55,17 @@ function MsDigiGold() {
       setLoading(true);
       
       // Load gold rate
-      const ratesRes = await window.electronAPI.getMetalRates();
+      const ratesRes = await supabaseAPI.getMetalRates();
       if (ratesRes.success && ratesRes.metal_rates && ratesRes.metal_rates.length > 0) {
         setGoldRate(parseFloat(ratesRes.metal_rates[0].gold_rate) || 0);
       }
 
       // Load customers
-      const custRes = await window.electronAPI.getAllCustomers();
+      const custRes = await supabaseAPI.getAllCustomers();
       if (custRes) setCustomers(custRes);
 
       // Load schemes
-      const schemesRes = await window.electronAPI.getAllGoldSchemes();
+      const schemesRes = await supabaseAPI.getAllGoldSchemes();
       if (schemesRes) setSchemes(schemesRes);
 
     } catch (err) {
@@ -103,7 +104,7 @@ function MsDigiGold() {
         bonusAmount: schemeForm.hasBonus ? parseFloat(schemeForm.presetAmount) : 0
       };
 
-      const res = await window.electronAPI.saveGoldScheme(payload);
+      const res = await supabaseAPI.saveGoldScheme(payload);
       if (res?.id) {
         showToast('Gold Scheme started successfully!');
         setShowCreateModal(false);
@@ -140,7 +141,7 @@ function MsDigiGold() {
         isBonus: collectForm.isBonus ? 1 : 0
       };
 
-      const res = await window.electronAPI.saveGoldCollection(payload);
+      const res = await supabaseAPI.saveGoldCollection(payload);
       if (res?.id) {
         showToast('Collection payment recorded!');
         setShowCollectModal(false);
@@ -161,7 +162,7 @@ function MsDigiGold() {
   const loadCollectionsHistory = async (scheme) => {
     try {
       setHistoryLoading(true);
-      const res = await window.electronAPI.getGoldCollections(scheme.id);
+      const res = await supabaseAPI.getGoldCollections(scheme.id);
       if (res) {
         setCollectionsHistory(res);
       }
@@ -182,7 +183,7 @@ function MsDigiGold() {
   const handleDeleteCollection = async (collectionId) => {
     if (!window.confirm('Are you sure you want to delete this collection entry?')) return;
     try {
-      await window.electronAPI.deleteGoldCollection(collectionId);
+      await supabaseAPI.deleteGoldCollection(collectionId);
       showToast('Collection payment entry deleted.');
       // Refresh current scheme history and total scheme list
       await loadCollectionsHistory(activeScheme);
@@ -197,7 +198,7 @@ function MsDigiGold() {
     const nextStatus = currentStatus === 'active' ? 'completed' : 'active';
     if (!window.confirm(`Mark this scheme as ${nextStatus.toUpperCase()}?`)) return;
     try {
-      await window.electronAPI.updateGoldSchemeStatus(scheme.id, nextStatus);
+      await supabaseAPI.updateGoldSchemeStatus(scheme.id, nextStatus);
       showToast(`Scheme status updated to ${nextStatus}!`);
       loadData();
     } catch (err) {
@@ -209,7 +210,7 @@ function MsDigiGold() {
   const handleDeleteScheme = async (schemeId) => {
     if (!window.confirm('Deleting this scheme will delete all its recorded collections too. Proceed?')) return;
     try {
-      await window.electronAPI.deleteGoldScheme(schemeId);
+      await supabaseAPI.deleteGoldScheme(schemeId);
       showToast('Gold scheme completely deleted.');
       loadData();
     } catch (err) {

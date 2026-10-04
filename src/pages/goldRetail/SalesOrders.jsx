@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Calendar, X, Plus, Trash2 } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
+import { supabaseAPI } from '../../db/supabaseAPI';
 
 export default function SalesOrderPage() {
   const outletContext = useOutletContext();
@@ -38,7 +39,7 @@ export default function SalesOrderPage() {
 
   const fetchRates = async () => {
     try {
-      const res = await window.electronAPI?.getMetalRates();
+      const res = await supabaseAPI.getMetalRates();
       if (res?.success && res.metal_rates?.length > 0) {
         const r = res.metal_rates[0];
         setMetalRates({
@@ -55,7 +56,7 @@ export default function SalesOrderPage() {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const response = await window.electronAPI?.getAllSalesOrders();
+      const response = await supabaseAPI.getAllSalesOrders();
       if (response) setOrders(response);
     } catch (error) {
       console.error('Error loading orders:', error);
@@ -92,7 +93,7 @@ export default function SalesOrderPage() {
         deliveryDate, status,
         notes: notes || null
       };
-      const response = await window.electronAPI?.saveSalesOrder(orderData);
+      const response = await supabaseAPI.saveSalesOrder(orderData);
       if (response?.id) {
         await loadOrders();
         setShowModal(false);
@@ -106,7 +107,7 @@ export default function SalesOrderPage() {
 
   const handleChangeStatus = async (orderId, newStatus) => {
     try {
-      const response = await window.electronAPI?.updateOrderStatus(orderId, newStatus);
+      const response = await supabaseAPI.updateOrderStatus(orderId, newStatus);
       if (response) {
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
       }
@@ -116,7 +117,7 @@ export default function SalesOrderPage() {
   const handleDeleteOrder = async (orderId) => {
     if (window.confirm('Delete this order?')) {
       try {
-        await window.electronAPI?.deleteSalesOrder(orderId);
+        await supabaseAPI.deleteSalesOrder(orderId);
         setOrders(prev => prev.filter(o => o.id !== orderId));
       } catch (error) { console.error(error); }
     }

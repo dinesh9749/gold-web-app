@@ -88,7 +88,7 @@ export default function GoldReports() {
   const loadAllData = useCallback(async () => {
     try {
       setLoading(true);
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       
       const [invRes, recRes, ordRes, stkRes, digiRes, soldRes, empRes, ratesRes] = await Promise.allSettled([
         api.getAllInvoices ? api.getAllInvoices() : [],

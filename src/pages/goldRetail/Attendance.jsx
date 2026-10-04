@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { supabaseAPI } from '../../db/supabaseAPI';
 
 const statusConfig = {
     present: { label: 'Present', color: '#4ade80', bg: 'rgba(74,222,128,0.12)', icon: '✅' },
@@ -37,7 +38,7 @@ export default function AttendancePage() {
     // Load employees
     const loadEmployees = useCallback(async () => {
         try {
-            const res = await window.electronAPI?.getAllEmployees() || [];
+            const res = await supabaseAPI.getAllEmployees() || [];
             setEmployees(res);
         } catch (e) { console.error(e); }
     }, []);
@@ -48,7 +49,7 @@ export default function AttendancePage() {
     const loadAttendance = useCallback(async () => {
         setLoadingAtt(true);
         try {
-            const marked = await window.electronAPI?.getAttendanceByDate(selectedDate) || [];
+            const marked = await supabaseAPI.getAttendanceByDate(selectedDate) || [];
             const merged = employees.map(emp => {
                 const rec = marked.find(a => a.employeeId === emp.id);
                 return {
@@ -80,7 +81,7 @@ export default function AttendancePage() {
     const loadSummary = useCallback(async () => {
         setLoadingSummary(true);
         try {
-            const res = await window.electronAPI?.getMonthlySummary(summaryMonth, summaryYear) || [];
+            const res = await supabaseAPI.getMonthlySummary(summaryMonth, summaryYear) || [];
             setSummary(res);
         } catch (e) { console.error(e); }
         finally { setLoadingSummary(false); }
@@ -96,7 +97,7 @@ export default function AttendancePage() {
     const saveRow = async (row) => {
         setSavingRows(prev => ({ ...prev, [row.employeeId]: true }));
         try {
-            await window.electronAPI?.markAttendance({
+            await supabaseAPI.markAttendance({
                 employeeId: row.employeeId,
                 date: selectedDate,
                 status: row.status,

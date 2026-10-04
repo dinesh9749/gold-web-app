@@ -1,26 +1,28 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { getSessionData, clearAuthSession } from '../utils/authSession';
 
 export default function FeatureGuard({ children, isSuperAdminOnly, featureKey, erpModuleKey }) {
   const location = useLocation();
-  const userRole = localStorage.getItem("goldApp_userRole");
+  const session = getSessionData();
   const org = JSON.parse(localStorage.getItem("goldApp_org") || "null");
 
-  // 1. Check Authentication
-  if (!userRole) {
+  // 1. Verify Cryptographic Session
+  if (!session.isValid) {
+    clearAuthSession();
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // 2. Super Admin Authorization
   if (isSuperAdminOnly) {
-    if (userRole !== "superadmin") {
+    if (!session.isSuperAdmin) {
       return <Navigate to="/dashboard" replace />;
     }
     return children;
   }
 
   // If logged in as superadmin, send them to superadmin dashboard
-  if (userRole === "superadmin") {
+  if (session.isSuperAdmin) {
     return <Navigate to="/super-admin" replace />;
   }
 

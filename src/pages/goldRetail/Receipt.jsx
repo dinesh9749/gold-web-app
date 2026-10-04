@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Printer, Save, Trash, Eye, RefreshCw, X } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
+import { supabaseAPI } from "../../db/supabaseAPI";
 
 const incrementReceiptNo = (recNo) => {
   if (!recNo) return 'REC-1001';
@@ -125,13 +126,13 @@ const Receipt = () => {
   const loadData = async () => {
     try {
       // Load customers
-      const custRes = await window.electronAPI?.getAllCustomers();
+      const custRes = await supabaseAPI.getAllCustomers();
       if (custRes) setCustomers(custRes);
 
       // Load settings and existing receipts to calculate true next sequence number
       const [settingsRes, recRes] = await Promise.all([
-        window.electronAPI?.getOrganizationSettings(),
-        window.electronAPI?.getAllReceipts()
+        supabaseAPI.getOrganizationSettings(),
+        supabaseAPI.getAllReceipts()
       ]);
 
       if (recRes) setReceipts(recRes);
@@ -140,7 +141,7 @@ const Receipt = () => {
       setReceiptData(prev => ({ ...prev, receiptNo: nextSeqNo }));
 
       // Load live gold rates (22K)
-      const ratesRes = await window.electronAPI?.getMetalRates();
+      const ratesRes = await supabaseAPI.getMetalRates();
       if (ratesRes?.success && ratesRes.metal_rates?.length > 0) {
         const rate = parseFloat(ratesRes.metal_rates[0].gold_rate) || 0;
         setLiveGoldRate(rate);
@@ -166,7 +167,7 @@ const Receipt = () => {
   const loadReceiptsHistory = async () => {
     try {
       setHistoryLoading(true);
-      const res = await window.electronAPI?.getAllReceipts();
+      const res = await supabaseAPI.getAllReceipts();
       if (res) setReceipts(res);
     } catch (error) {
       console.error("Error loading receipt history:", error);
@@ -178,8 +179,8 @@ const Receipt = () => {
   const handleClosePreview = async () => {
     setShowPreview(false);
     if (!receiptData.id) {
-      const freshReceipts = (await window.electronAPI?.getAllReceipts()) || receipts;
-      const settingsRes = await window.electronAPI?.getOrganizationSettings();
+      const freshReceipts = (await supabaseAPI.getAllReceipts()) || receipts;
+      const settingsRes = await supabaseAPI.getOrganizationSettings();
       const nextSeqNo = getNextReceiptSequence(settingsRes?.next_receipt_number, freshReceipts);
 
       setReceiptData({
@@ -214,8 +215,8 @@ const Receipt = () => {
   const handleReloadSequence = async () => {
     try {
       const [settingsRes, recRes] = await Promise.all([
-        window.electronAPI?.getOrganizationSettings(),
-        window.electronAPI?.getAllReceipts()
+        supabaseAPI.getOrganizationSettings(),
+        supabaseAPI.getAllReceipts()
       ]);
       const nextSeqNo = getNextReceiptSequence(settingsRes?.next_receipt_number, recRes || receipts);
       setReceiptData(prev => ({ ...prev, receiptNo: nextSeqNo }));
@@ -361,11 +362,11 @@ const Receipt = () => {
         }))
       };
 
-      const res = await window.electronAPI?.saveReceipt(payload);
+      const res = await supabaseAPI.saveReceipt(payload);
       if (res?.id) {
         // Increment and save the sequence formatting
         const nextNo = incrementReceiptNo(receiptData.receiptNo);
-        await window.electronAPI?.updateOrganizationSettings(undefined, nextNo);
+        await supabaseAPI.updateOrganizationSettings(undefined, nextNo);
 
         const savedObj = { ...payload, id: res.id, receiptNo: receiptData.receiptNo, receiptNumber: receiptData.receiptNo };
         setReceipts(prev => [savedObj, ...prev]);
@@ -384,7 +385,7 @@ const Receipt = () => {
   const handleDeleteReceipt = async (id) => {
     if (!window.confirm("Are you sure you want to delete this receipt record?")) return;
     try {
-      const res = await window.electronAPI?.deleteReceipt(id);
+      const res = await supabaseAPI.deleteReceipt(id);
       if (res) {
         alert("Receipt deleted.");
         loadReceiptsHistory();
@@ -397,7 +398,7 @@ const Receipt = () => {
 
   const handleLoadReceiptDetails = async (id) => {
     try {
-      const res = await window.electronAPI?.getReceiptById(id);
+      const res = await supabaseAPI.getReceiptById(id);
       if (res) {
         setReceiptData({
           id: res.id,
@@ -432,18 +433,12 @@ const Receipt = () => {
   };
 
   const handlePrint = () => {
-    const printContent = document.getElementById("invoice-preview");
-    if (!printContent) return;
-    const originalContents = document.body.innerHTML;
-    document.body.innerHTML = printContent.outerHTML;
     window.print();
-    document.body.innerHTML = originalContents;
-    window.location.reload();
   };
 
   const handleOpenPaymentModal = async (receipt) => {
     try {
-      const fullRes = await window.electronAPI?.getReceiptById(receipt.id);
+      const fullRes = await supabaseAPI.getReceiptById(receipt.id);
       if (fullRes) {
         setPaymentReceipt(fullRes);
         setNewPaymentAmount("");
@@ -465,10 +460,10 @@ const Receipt = () => {
     }
     setPaymentSaving(true);
     try {
-      const res = await window.electronAPI?.saveReceiptPayment(paymentReceipt.id, amt, newPaymentDate);
+      const res = await supabaseAPI.saveReceiptPayment(paymentReceipt.id, amt, newPaymentDate);
       if (res) {
         alert("Payment recorded successfully!");
-        const updated = await window.electronAPI?.getReceiptById(paymentReceipt.id);
+        const updated = await supabaseAPI.getReceiptById(paymentReceipt.id);
         if (updated) {
           setPaymentReceipt(updated);
         }
@@ -486,9 +481,9 @@ const Receipt = () => {
   const handleDeletePayment = async (paymentId) => {
     if (!window.confirm("Are you sure you want to delete this payment record?")) return;
     try {
-      await window.electronAPI?.deleteReceiptPayment(paymentId);
+      await supabaseAPI.deleteReceiptPayment(paymentId);
       alert("Payment transaction deleted successfully.");
-      const updated = await window.electronAPI?.getReceiptById(paymentReceipt.id);
+      const updated = await supabaseAPI.getReceiptById(paymentReceipt.id);
       if (updated) {
         setPaymentReceipt(updated);
       }
@@ -959,6 +954,18 @@ const Receipt = () => {
                       padding: 0 !important;
                       visibility: hidden;
                     }
+                    #invoice-preview, #invoice-preview * {
+                      visibility: visible !important;
+                    }
+                    #invoice-preview {
+                      position: absolute !important;
+                      left: 0 !important;
+                      top: 0 !important;
+                      width: 100% !important;
+                      margin: 0 !important;
+                      background: #ffffff !important;
+                      z-index: 999999 !important;
+                    }
                     .paper-a4 {
                       width: 100% !important;
                       min-height: 297mm !important;
@@ -1173,7 +1180,7 @@ const Receipt = () => {
                       onClick={async () => {
                         if (!window.confirm("Remove this thumbnail photo?")) return;
                         try {
-                          await window.electronAPI?.updateReceiptPhoto(photoManagerReceipt.id, null);
+                          await supabaseAPI.updateReceiptPhoto(photoManagerReceipt.id, null);
                           setPhotoManagerReceipt(prev => ({ ...prev, productPhoto: null }));
                           setPhotoManagerMessage("Photo removed successfully!");
                           loadReceiptsHistory();
@@ -1207,7 +1214,7 @@ const Receipt = () => {
                     reader.onloadend = async () => {
                       try {
                         const base64 = reader.result;
-                        await window.electronAPI?.updateReceiptPhoto(photoManagerReceipt.id, base64);
+                        await supabaseAPI.updateReceiptPhoto(photoManagerReceipt.id, base64);
                         setPhotoManagerReceipt(prev => ({ ...prev, productPhoto: base64 }));
                         setPhotoManagerMessage("Photo uploaded successfully!");
                         loadReceiptsHistory();

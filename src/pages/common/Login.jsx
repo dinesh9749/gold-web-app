@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabaseAPI } from '../../db/supabaseAPI';
+import { getSessionData, clearAuthSession } from '../../utils/authSession';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -10,12 +11,16 @@ export default function Login() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    // If already logged in, redirect accordingly
-    const userRole = localStorage.getItem("goldApp_userRole");
-    if (userRole === "superadmin") {
-      navigate("/super-admin", { replace: true });
-    } else if (userRole === "org") {
-      navigate("/dashboard", { replace: true });
+    // If already logged in with a cryptographically valid token, redirect accordingly
+    const session = getSessionData();
+    if (session.isValid) {
+      if (session.isSuperAdmin) {
+        navigate("/super-admin", { replace: true });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
+    } else {
+      clearAuthSession();
     }
   }, [navigate]);
 
@@ -29,31 +34,33 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // 1. Check Super Admin hardcoded login
-      if (loginSlug.trim().toLowerCase() === 'superadmin' && password === 'supergold123') {
-        localStorage.setItem("goldApp_userRole", "superadmin");
-        localStorage.removeItem("goldApp_org");
-        navigate("/super-admin", { replace: true });
-        return;
-      }
-
-      // 2. Query organization in database
-      const org = await supabaseAPI.loginOrganization(loginSlug, password);
-      if (org) {
-        if (!org.isActive) {
+      // Authenticate against database via secure RPC (with bcrypt hash verification)
+      const res = await supabaseAPI.loginOrganization(loginSlug, password);
+      if (res && res.token) {
+        if (!res.isActive) {
           setErrorMsg("This organization account is deactivated. Please contact support.");
           setLoading(false);
           return;
         }
-        localStorage.setItem("goldApp_userRole", "org");
-        localStorage.setItem("goldApp_org", JSON.stringify(org));
-        navigate("/dashboard", { replace: true });
+
+        // Store signed session token
+        localStorage.setItem("goldApp_sessionToken", res.token);
+
+        if (res.isSuperAdmin || res.role === 'superadmin') {
+          localStorage.setItem("goldApp_userRole", "superadmin");
+          localStorage.removeItem("goldApp_org");
+          navigate("/super-admin", { replace: true });
+        } else {
+          localStorage.setItem("goldApp_userRole", "org");
+          localStorage.setItem("goldApp_org", JSON.stringify(res));
+          navigate("/dashboard", { replace: true });
+        }
       } else {
         setErrorMsg("Invalid organization slug or password.");
       }
     } catch (err) {
       console.error(err);
-      setErrorMsg("Authentication failed. Make sure database migrations are run.");
+      setErrorMsg(err.message || "Authentication failed. Make sure database migrations are run.");
     } finally {
       setLoading(false);
     }

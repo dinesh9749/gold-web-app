@@ -145,7 +145,7 @@ export default function SuperAdmin() {
     setEditingId(org.id);
     setName(org.name);
     setLoginSlug(org.loginSlug);
-    setPassword(org.password);
+    setPassword('');
     setIsActive(org.isActive);
     setFeatures({ ...INITIAL_FEATURES, ...(org.features || {}) });
     setErrorMsg('');
@@ -153,8 +153,8 @@ export default function SuperAdmin() {
 
   const handleSaveSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !loginSlug.trim() || !password) {
-      setErrorMsg("Please fill in all organization details.");
+    if (!name.trim() || !loginSlug.trim() || (!editingId && !password)) {
+      setErrorMsg("Please fill in all required organization details.");
       return;
     }
     setErrorMsg('');
@@ -163,7 +163,7 @@ export default function SuperAdmin() {
     const payload = {
       name: name.trim(),
       loginSlug: loginSlug.trim().toLowerCase(),
-      password,
+      password: password || undefined,
       isActive,
       features
     };
@@ -205,7 +205,6 @@ export default function SuperAdmin() {
     const updatedPayload = {
       name: org.name,
       loginSlug: org.loginSlug,
-      password: org.password,
       isActive: !org.isActive,
       features: org.features
     };
@@ -392,7 +391,7 @@ export default function SuperAdmin() {
                           </span>
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                          Slug: <code style={{ color: 'var(--gold-200)' }}>{org.loginSlug}</code> | Password: <code>{org.password}</code>
+                          Slug: <code style={{ color: 'var(--gold-200)' }}>{org.loginSlug}</code> | Security: <span style={{ color: '#4ade80', fontSize: 11, fontWeight: 700 }}>● Hashed &amp; Protected</span>
                         </div>
                       </div>
                       
@@ -569,14 +568,14 @@ export default function SuperAdmin() {
                   />
                 </div>
                 <div>
-                  <label className="form-label">Login Password</label>
+                  <label className="form-label">{editingId ? "Update Password (Optional)" : "Login Password"}</label>
                   <input
-                    type="text"
+                    type="password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     className="form-input"
-                    placeholder="e.g. secure123"
-                    required
+                    placeholder={editingId ? "Leave blank to keep existing password" : "e.g. secure123"}
+                    required={!editingId}
                   />
                 </div>
               </div>

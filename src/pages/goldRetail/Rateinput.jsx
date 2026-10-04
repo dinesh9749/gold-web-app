@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { silverStore } from '../../db/silverRetailStore';
+import { supabaseAPI } from '../../db/supabaseAPI';
 
 const GoldSilverRateInput = () => {
   const initialErp = localStorage.getItem("activeErpModule") || "gold_retail";
@@ -20,14 +21,12 @@ const GoldSilverRateInput = () => {
   useEffect(() => {
     const fetchCurrentRates = async () => {
       try {
-        if (window.electronAPI?.getMetalRates) {
-          const result = await window.electronAPI.getMetalRates();
-          if (result.success && result.metal_rates && result.metal_rates.length > 0) {
-            const r = result.metal_rates[0];
-            if (r.gold_rate) setGoldRate(r.gold_rate.toString());
-            if (r.silver_rate) setSilverRate(r.silver_rate.toString());
-            if (r.gold_24_rate) setGold24Rate(r.gold_24_rate.toString());
-          }
+        const result = await supabaseAPI.getMetalRates();
+        if (result.success && result.metal_rates && result.metal_rates.length > 0) {
+          const r = result.metal_rates[0];
+          if (r.gold_rate) setGoldRate(r.gold_rate.toString());
+          if (r.silver_rate) setSilverRate(r.silver_rate.toString());
+          if (r.gold_24_rate) setGold24Rate(r.gold_24_rate.toString());
         }
       } catch (error) {
         console.error('Error fetching current rates:', error);
@@ -48,15 +47,11 @@ const GoldSilverRateInput = () => {
     }
     try {
       setSubmitting(true);
-      if (window.electronAPI?.saveMetalRates) {
-        const result = await window.electronAPI.saveMetalRates({ goldRate: g, silverRate: s, gold24Rate: g24 });
-        if (result.success) {
-          showNotification('Metal rates saved successfully!', 'success');
-        } else {
-          showNotification(`Error: ${result.error}`, 'error');
-        }
+      const result = await supabaseAPI.saveMetalRates({ goldRate: g, silverRate: s, gold24Rate: g24 });
+      if (result.success) {
+        showNotification('Metal rates saved successfully!', 'success');
       } else {
-        showNotification('Rates updated locally!', 'success');
+        showNotification(`Error: ${result.error}`, 'error');
       }
     } catch (error) {
       showNotification(`Error: ${error.message}`, 'error');

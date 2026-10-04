@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabaseAPI } from '../../db/supabaseAPI';
 
 export default function Dashboard() {
   const [dateTime, setDateTime] = useState(new Date());
@@ -10,7 +11,7 @@ export default function Dashboard() {
     const fetchMetalRates = async () => {
       try {
         setLoading(true);
-        const result = await window.electronAPI.getMetalRates();
+        const result = await supabaseAPI.getMetalRates();
         if (result.success && result.metal_rates && result.metal_rates.length > 0) {
           const r = result.metal_rates[0];
           setRates({ gold22: r.gold_rate, gold24: r.gold_24_rate, silver: r.silver_rate });

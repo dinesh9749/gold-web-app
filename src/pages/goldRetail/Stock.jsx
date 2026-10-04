@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Plus, Minus, Search, Trash2, TrendingUp, RefreshCw, BarChart2 } from "lucide-react";
+import { supabaseAPI } from "../../db/supabaseAPI";
 
 const PURITIES = ["22K (916)", "18K", "24K (999)", "14K", "Silver", "General / Non-Metal"];
 const COMMON_ITEMS = ["Ring", "Chain", "Bangle", "Necklace", "Bracelet", "Earrings", "Coin", "Gold Bar", "Jewelry Box", "Tag/Label"];
@@ -34,7 +35,7 @@ export default function Stock() {
   const loadTransactions = async () => {
     try {
       setLoading(true);
-      const res = await window.electronAPI?.getAllStockTransactions();
+      const res = await supabaseAPI.getAllStockTransactions();
       if (res) {
         setTransactions(res);
       }
@@ -116,7 +117,7 @@ export default function Stock() {
         parentTransactionId: parentBatch ? parentBatch.id : null
       };
 
-      const result = await window.electronAPI?.saveStockTransaction(payload);
+      const result = await supabaseAPI.saveStockTransaction(payload);
       if (result) {
         alert(`Stock ${modalType === 'IN' ? 'In' : 'Out'} transaction logged successfully!`);
         setShowModal(false);
@@ -133,7 +134,7 @@ export default function Stock() {
   const handleDeleteTransaction = async (id) => {
     if (!window.confirm("Are you sure you want to delete this stock transaction? This will permanently undo its inventory impact.")) return;
     try {
-      await window.electronAPI?.deleteStockTransaction(id);
+      await supabaseAPI.deleteStockTransaction(id);
       alert("Transaction deleted.");
       loadTransactions();
     } catch (err) {

@@ -1,13 +1,21 @@
 import { supabase } from './supabaseClient';
+import { getSessionData } from '../utils/authSession';
 
 const ensureRowReturned = (data, tableName) => {
   if (!data || data.length === 0) {
-    throw new Error(`No data returned from table '${tableName}'. If you are running Supabase, verify that Row-Level Security (RLS) is disabled for '${tableName}' or that you have created an appropriate SELECT policy.`);
+    throw new Error(`No data returned from table '${tableName}'. Operation could not be completed.`);
   }
   return data[0];
 };
 
 const getActiveOrgId = () => {
+  const session = getSessionData();
+  if (session.isValid) {
+    if (session.isSuperAdmin) {
+      return '00000000-0000-0000-0000-000000000000';
+    }
+    return session.orgId;
+  }
   const role = localStorage.getItem("goldApp_userRole");
   if (role === "superadmin") {
     return '00000000-0000-0000-0000-000000000000';
@@ -19,9 +27,10 @@ const getActiveOrgId = () => {
 export const supabaseAPI = {
   // --- ORGANIZATIONS (SUPER ADMIN ONLY) ---
   getAllOrganizations: async () => {
+    // Select only safe non-sensitive columns; NEVER query password or password_hash
     const { data, error } = await supabase
       .from('organizations')
-      .select('*')
+      .select('id, name, login_slug, is_active, features, created_at, is_superadmin')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data.map(row => {
@@ -33,8 +42,8 @@ export const supabaseAPI = {
         id: row.id,
         name: row.name,
         loginSlug: row.login_slug,
-        password: row.password,
         isActive: row.is_active,
+        isSuperAdmin: row.is_superadmin || false,
         features: parsedFeatures || {},
         createdAt: row.created_at
       };
@@ -42,33 +51,29 @@ export const supabaseAPI = {
   },
 
   saveOrganization: async (orgData) => {
-    const { data, error } = await supabase
-      .from('organizations')
-      .insert([{
-        name: orgData.name,
-        login_slug: orgData.loginSlug,
-        password: orgData.password,
-        is_active: orgData.isActive !== false,
-        features: orgData.features
-      }])
-      .select();
+    const { data, error } = await supabase.rpc('save_organization_secure', {
+      p_name: orgData.name,
+      p_slug: orgData.loginSlug,
+      p_password: orgData.password,
+      p_is_active: orgData.isActive !== false,
+      p_features: orgData.features || {}
+    });
     if (error) throw error;
-    const row = ensureRowReturned(data, 'organizations');
-    return { id: row.id };
+    if (!data?.success) throw new Error(data?.error || "Failed to save organization");
+    return { id: data.id };
   },
 
   updateOrganization: async (id, orgData) => {
-    const { error } = await supabase
-      .from('organizations')
-      .update({
-        name: orgData.name,
-        login_slug: orgData.loginSlug,
-        password: orgData.password,
-        is_active: orgData.isActive !== false,
-        features: orgData.features
-      })
-      .eq('id', id);
+    const { data, error } = await supabase.rpc('save_organization_secure', {
+      p_name: orgData.name,
+      p_slug: orgData.loginSlug,
+      p_password: orgData.password || null,
+      p_is_active: orgData.isActive !== false,
+      p_features: orgData.features || {},
+      p_id: id
+    });
     if (error) throw error;
+    if (!data?.success) throw new Error(data?.error || "Failed to update organization");
 
     // Update active org in local storage if editing active tenant session
     const currentOrg = JSON.parse(localStorage.getItem("goldApp_org") || "null");
@@ -112,24 +117,24 @@ export const supabaseAPI = {
   },
 
   loginOrganization: async (loginSlug, password) => {
-    const { data, error } = await supabase
-      .from('organizations')
-      .select('*')
-      .eq('login_slug', loginSlug.trim().toLowerCase())
-      .eq('password', password)
-      .maybeSingle();
+    const { data, error } = await supabase.rpc('login_organization', {
+      p_slug: loginSlug.trim().toLowerCase(),
+      p_password: password
+    });
     if (error) throw error;
-    if (!data) return null;
-    let parsedFeatures = data.features;
-    if (typeof parsedFeatures === 'string') {
-      try { parsedFeatures = JSON.parse(parsedFeatures); } catch (e) { parsedFeatures = {}; }
+    if (!data || !data.success) {
+      throw new Error(data?.error || "Invalid organization slug or password.");
     }
+    const org = data.org;
     return {
-      id: data.id,
-      name: data.name,
-      loginSlug: data.login_slug,
-      isActive: data.is_active,
-      features: parsedFeatures || {}
+      id: org.id,
+      name: org.name,
+      loginSlug: org.loginSlug,
+      isActive: org.isActive,
+      isSuperAdmin: org.isSuperAdmin,
+      role: org.role,
+      features: org.features || {},
+      token: data.token
     };
   },
 

@@ -1,15 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { silverStore, calculateSilverItem, calculateOldSilverExchange } from '../../db/silverRetailStore';
-import { ShoppingBag, Plus, Trash2, Printer, Search, RefreshCw, ArrowLeft, CheckCircle2, DollarSign } from 'lucide-react';
+import { ShoppingBag, Plus, Trash2, Printer, Search, RefreshCw, ArrowLeft, CheckCircle2, DollarSign, SlidersHorizontal, Save, Eye } from 'lucide-react';
 
 export default function SilverRetailInvoice() {
   const navigate = useNavigate();
   const [rates, setRates] = useState(silverStore.getRates());
   const [stockList, setStockList] = useState([]);
-  
-  // Customer State
+
+  // Display Options State (Persisted in localStorage)
+  const [displayOptions, setDisplayOptions] = useState(() => {
+    const saved = localStorage.getItem('silver_retail_display_options');
+    return saved ? JSON.parse(saved) : {
+      enableTagging: true,
+      deliveryName: true,
+      productGroup: true,
+      hsn: true,
+      stoneWeight: true,
+      netWeight: true,
+      mcPer: true,
+      mcAmt: true,
+      stAmt: true,
+    };
+  });
+
+  const [showDisplayPopover, setShowDisplayPopover] = useState(false);
+  const [tempDisplayOptions, setTempDisplayOptions] = useState(displayOptions);
+
+  // Header & Form State
+  const [enableGst, setEnableGst] = useState(true);
+  const [billDate, setBillDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [customerName, setCustomerName] = useState('');
+  const [deliveryName, setDeliveryName] = useState('');
+  const [counter, setCounter] = useState('Muthu Kumaran Jewellery');
+  const [salesPerson, setSalesPerson] = useState('');
   const [customerMobile, setCustomerMobile] = useState('');
   const [customerGstin, setCustomerGstin] = useState('');
 
@@ -18,9 +42,13 @@ export default function SilverRetailInvoice() {
     {
       id: Date.now(),
       tagNumber: '',
+      productGroup: '',
       title: '',
+      hsn: '',
+      qty: 1,
       grossWeight: 0,
       stoneWeight: 0,
+      stoneAmount: 0,
       purity: 92.5,
       wastagePercent: 3.5,
       makingChargePerGram: 18.00,
@@ -54,6 +82,17 @@ export default function SilverRetailInvoice() {
     setStockList(silverStore.getStock().filter(s => s.status === 'In Stock'));
   }, []);
 
+  const handleOpenDisplayPopover = () => {
+    setTempDisplayOptions({ ...displayOptions });
+    setShowDisplayPopover(prev => !prev);
+  };
+
+  const handleSaveDisplayOptions = () => {
+    setDisplayOptions(tempDisplayOptions);
+    localStorage.setItem('silver_retail_display_options', JSON.stringify(tempDisplayOptions));
+    setShowDisplayPopover(false);
+  };
+
   // Update item rate if purity changes
   const handlePurityChange = (idx, purityVal) => {
     const p = parseFloat(purityVal);
@@ -81,9 +120,13 @@ export default function SilverRetailInvoice() {
       {
         id: Date.now() + Math.random(),
         tagNumber: '',
-        title: 'Silver Ornament',
+        productGroup: '',
+        title: '',
+        hsn: '',
+        qty: 1,
         grossWeight: 0,
         stoneWeight: 0,
+        stoneAmount: 0,
         purity: 92.5,
         wastagePercent: 3.0,
         makingChargePerGram: 15.00,
@@ -100,20 +143,22 @@ export default function SilverRetailInvoice() {
 
   const selectStockTag = (tagItem) => {
     const newItems = [...items];
-    // overwrite first empty row or append
     const emptyIdx = newItems.findIndex(i => i.grossWeight === 0);
-    const targetIdx = emptyIdx >= 0 ? emptyIdx : newItems.length;
 
     const row = {
       id: Date.now() + Math.random(),
       tagNumber: tagItem.tagNumber,
+      productGroup: tagItem.productGroup || 'Silver Ornaments',
       title: tagItem.title,
+      hsn: tagItem.hsn || '7113',
+      qty: 1,
       grossWeight: tagItem.grossWeight,
-      stoneWeight: tagItem.stoneWeight,
-      purity: tagItem.purity,
-      wastagePercent: tagItem.wastagePercent,
-      makingChargePerGram: tagItem.makingChargePerGram,
-      flatMakingCharge: tagItem.flatMakingCharge,
+      stoneWeight: tagItem.stoneWeight || 0,
+      stoneAmount: tagItem.stoneAmount || 0,
+      purity: tagItem.purity || 92.5,
+      wastagePercent: tagItem.wastagePercent || 3.0,
+      makingChargePerGram: tagItem.makingChargePerGram || 15.00,
+      flatMakingCharge: tagItem.flatMakingCharge || 0,
       ratePerGram: tagItem.purity === 99.9 ? rates.silver999 : rates.silver925
     };
 
@@ -136,11 +181,27 @@ export default function SilverRetailInvoice() {
       makingChargePerGram: it.makingChargePerGram,
       flatMakingCharge: it.flatMakingCharge,
       ratePerGram: it.ratePerGram,
-      gstRate: 3.0
+      gstRate: enableGst ? 3.0 : 0.0
     });
-    return { ...it, ...calc };
+    const stAmt = parseFloat(it.stoneAmount) || 0;
+    const finalSubtotal = calc.itemSubtotal + stAmt;
+    const finalTax = enableGst ? (finalSubtotal * 0.03) : 0;
+    const finalTotal = finalSubtotal + finalTax;
+    return {
+      ...it,
+      ...calc,
+      stoneAmount: stAmt,
+      itemSubtotal: Number(finalSubtotal.toFixed(2)),
+      taxAmount: Number(finalTax.toFixed(2)),
+      totalAmount: Number(finalTotal.toFixed(2))
+    };
   });
 
+  const totalQty = calculatedItems.reduce((acc, curr) => acc + (parseInt(curr.qty) || 1), 0);
+  const totalGrossWt = calculatedItems.reduce((acc, curr) => acc + (parseFloat(curr.grossWeight) || 0), 0);
+  const totalStoneWt = calculatedItems.reduce((acc, curr) => acc + (parseFloat(curr.stoneWeight) || 0), 0);
+  const totalNetWt = calculatedItems.reduce((acc, curr) => acc + (parseFloat(curr.netWeight) || 0), 0);
+  const totalFineWt = calculatedItems.reduce((acc, curr) => acc + (parseFloat(curr.fineWeight) || 0), 0);
   const grossSubtotal = calculatedItems.reduce((acc, curr) => acc + curr.totalAmount, 0);
 
   const exchangeCalc = enableExchange ? calculateOldSilverExchange({
@@ -160,8 +221,13 @@ export default function SilverRetailInvoice() {
 
     const invoicePayload = {
       customerName,
+      deliveryName,
+      counter,
+      salesPerson,
       customerMobile,
       customerGstin,
+      billDate,
+      enableGst,
       items: calculatedItems,
       oldSilverExchange: enableExchange ? { ...exchangeItem, ...exchangeCalc } : null,
       subtotal: Number(grossSubtotal.toFixed(2)),
@@ -178,95 +244,339 @@ export default function SilverRetailInvoice() {
   };
 
   return (
-    <div style={{ padding: '24px 32px', color: 'var(--text-primary)', fontFamily: 'var(--font-family)' }}>
-      {/* Header Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button 
-            onClick={() => navigate('/silver-retail-dashboard')}
-            style={{ padding: 8, borderRadius: 10, border: '1px solid var(--border-default)', background: 'var(--bg-elevated)', cursor: 'pointer', color: 'var(--text-primary)' }}
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: '#f8fafc' }}>
-              Silver Retail POS Invoice Billing
-            </h1>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>
-              DK Nova Technologies — Silver Jewellery Counter
-            </span>
-          </div>
+    <div style={{ padding: '20px 28px', color: 'var(--text-primary)', fontFamily: 'var(--font-family)', background: 'var(--bg-primary)', minHeight: '100vh' }}>
+      
+      {/* Top Bar Header with Actions */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 14 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+            Retail Sale Bill :: Create
+          </h1>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            DK Nova Technologies — Silver Retail Counter
+          </span>
         </div>
 
-        {/* Live Rates Display */}
-        <div style={{ display: 'flex', gap: 12 }}>
-          <div style={{ padding: '6px 14px', borderRadius: 10, background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.3)', fontSize: 12 }}>
-            <span style={{ color: '#94a3b8' }}>Fine 999: </span>
-            <strong style={{ color: '#38bdf8' }}>₹ {rates.silver999}/g</strong>
+        {/* Action Controls Top Right */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, position: 'relative' }}>
+          
+          {/* Enable GST Checkbox */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+            <input 
+              type="checkbox" 
+              checked={enableGst}
+              onChange={(e) => setEnableGst(e.target.checked)}
+              style={{ width: 16, height: 16, accentColor: '#06b6d4', cursor: 'pointer' }}
+            />
+            Enable GST
+          </label>
+
+          {/* Display Button with Popover Dropdown */}
+          <div style={{ position: 'relative' }}>
+            <button 
+              onClick={handleOpenDisplayPopover}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 8,
+                border: 'none',
+                background: '#06b6d4',
+                color: '#ffffff',
+                fontWeight: 700,
+                fontSize: 13,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                boxShadow: '0 2px 8px rgba(6, 182, 212, 0.35)'
+              }}
+            >
+              <SlidersHorizontal size={15} /> Display
+            </button>
+
+            {/* Display Options Dropdown Popover */}
+            {showDisplayPopover && (
+              <div 
+                style={{
+                  position: 'absolute',
+                  top: '115%',
+                  right: 0,
+                  width: 330,
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  borderRadius: 12,
+                  padding: 18,
+                  boxShadow: '0 12px 36px rgba(0, 0, 0, 0.25)',
+                  zIndex: 300,
+                  border: '1px solid #cbd5e1'
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  
+                  {/* Enable Tagging */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={tempDisplayOptions.enableTagging} 
+                      onChange={(e) => setTempDisplayOptions({ ...tempDisplayOptions, enableTagging: e.target.checked })}
+                      style={{ width: 16, height: 16, accentColor: '#06b6d4', cursor: 'pointer' }}
+                    />
+                    Enable Tagging
+                  </label>
+
+                  {/* Delivery Name */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={tempDisplayOptions.deliveryName} 
+                      onChange={(e) => setTempDisplayOptions({ ...tempDisplayOptions, deliveryName: e.target.checked })}
+                      style={{ width: 16, height: 16, accentColor: '#06b6d4', cursor: 'pointer' }}
+                    />
+                    Delivery Name
+                  </label>
+
+                  {/* Product Group & Hsn */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={tempDisplayOptions.productGroup} 
+                        onChange={(e) => setTempDisplayOptions({ ...tempDisplayOptions, productGroup: e.target.checked })}
+                        style={{ width: 16, height: 16, accentColor: '#06b6d4', cursor: 'pointer' }}
+                      />
+                      Product Group
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={tempDisplayOptions.hsn} 
+                        onChange={(e) => setTempDisplayOptions({ ...tempDisplayOptions, hsn: e.target.checked })}
+                        style={{ width: 16, height: 16, accentColor: '#06b6d4', cursor: 'pointer' }}
+                      />
+                      Hsn
+                    </label>
+                  </div>
+
+                  {/* Stone Weight & Net Weight */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={tempDisplayOptions.stoneWeight} 
+                        onChange={(e) => setTempDisplayOptions({ ...tempDisplayOptions, stoneWeight: e.target.checked })}
+                        style={{ width: 16, height: 16, accentColor: '#06b6d4', cursor: 'pointer' }}
+                      />
+                      Stone Weight
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={tempDisplayOptions.netWeight} 
+                        onChange={(e) => setTempDisplayOptions({ ...tempDisplayOptions, netWeight: e.target.checked })}
+                        style={{ width: 16, height: 16, accentColor: '#06b6d4', cursor: 'pointer' }}
+                      />
+                      Net Weight
+                    </label>
+                  </div>
+
+                  {/* Mc/Per & Mc.Amt */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={tempDisplayOptions.mcPer} 
+                        onChange={(e) => setTempDisplayOptions({ ...tempDisplayOptions, mcPer: e.target.checked })}
+                        style={{ width: 16, height: 16, accentColor: '#06b6d4', cursor: 'pointer' }}
+                      />
+                      Mc/Per
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={tempDisplayOptions.mcAmt} 
+                        onChange={(e) => setTempDisplayOptions({ ...tempDisplayOptions, mcAmt: e.target.checked })}
+                        style={{ width: 16, height: 16, accentColor: '#06b6d4', cursor: 'pointer' }}
+                      />
+                      Mc.Amt
+                    </label>
+                  </div>
+
+                  {/* St.Amt */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={tempDisplayOptions.stAmt} 
+                      onChange={(e) => setTempDisplayOptions({ ...tempDisplayOptions, stAmt: e.target.checked })}
+                      style={{ width: 16, height: 16, accentColor: '#06b6d4', cursor: 'pointer' }}
+                    />
+                    St.Amt
+                  </label>
+
+                  {/* Save Button */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                    <button 
+                      onClick={handleSaveDisplayOptions}
+                      style={{
+                        padding: '8px 22px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: '#0284c7',
+                        color: '#ffffff',
+                        fontWeight: 700,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(2, 132, 199, 0.4)'
+                      }}
+                    >
+                      Save
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+            )}
           </div>
-          <div style={{ padding: '6px 14px', borderRadius: 10, background: 'rgba(129, 140, 248, 0.1)', border: '1px solid rgba(129, 140, 248, 0.3)', fontSize: 12 }}>
-            <span style={{ color: '#94a3b8' }}>Sterling 925: </span>
-            <strong style={{ color: '#818cf8' }}>₹ {rates.silver925}/g</strong>
-          </div>
+
+          {/* Save Button */}
+          <button 
+            onClick={handleSaveInvoice}
+            style={{
+              padding: '8px 18px',
+              borderRadius: 8,
+              border: '1px solid var(--border-default)',
+              background: 'var(--bg-elevated)',
+              color: 'var(--text-primary)',
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            <Save size={15} /> Save
+          </button>
+
+          {/* Back Button */}
+          <button 
+            onClick={() => navigate('/silver-retail-dashboard')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 8,
+              border: '1px solid var(--border-default)',
+              background: 'var(--bg-elevated)',
+              color: 'var(--text-primary)',
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            <ArrowLeft size={15} /> Back
+          </button>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 24 }}>
-        {/* Left Side: Invoice Items & Form */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Customer Details Box */}
-          <div className="card" style={{ padding: 20, borderRadius: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, marginBottom: 14, color: '#38bdf8' }}>
-              👤 Customer Details
-            </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>CUSTOMER NAME *</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Ramesh Patel" 
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', marginTop: 4, borderRadius: 10, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 13 }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>MOBILE NUMBER</label>
-                <input 
-                  type="text" 
-                  placeholder="+91 98765 43210" 
-                  value={customerMobile}
-                  onChange={(e) => setCustomerMobile(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', marginTop: 4, borderRadius: 10, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 13 }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>GSTIN (OPTIONAL)</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. 33AAAAA0000A1Z5" 
-                  value={customerGstin}
-                  onChange={(e) => setCustomerGstin(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', marginTop: 4, borderRadius: 10, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 13 }}
-                />
-              </div>
+      {/* Bill Header Info Form (Bill Date, Billing Name, Delivery Name, Counter, Sales Person) */}
+      <div className="card" style={{ padding: 18, borderRadius: 12, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: displayOptions.deliveryName ? '1fr 1.5fr 1.5fr 1.5fr 1fr' : '1fr 1.5fr 1.5fr 1fr', gap: 14, alignItems: 'end' }}>
+          
+          {/* Bill Date */}
+          <div>
+            <label style={{ fontSize: 11, color: '#ef4444', fontWeight: 700 }}>Bill Date *</label>
+            <input 
+              type="date" 
+              value={billDate}
+              onChange={(e) => setBillDate(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', marginTop: 4, borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 13 }}
+            />
+          </div>
+
+          {/* Billing Name */}
+          <div>
+            <label style={{ fontSize: 11, color: '#ef4444', fontWeight: 700 }}>Billing Name *</label>
+            <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+              <input 
+                type="text" 
+                placeholder="Billing Name" 
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 13 }}
+              />
+              <button style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-elevated)', cursor: 'pointer', color: 'var(--text-primary)', display: 'flex', alignItems: 'center' }}>
+                <Plus size={14} />
+              </button>
             </div>
           </div>
 
-          {/* Tag Quick Search */}
-          <div className="card" style={{ padding: 16, borderRadius: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Search size={18} color="#94a3b8" />
+          {/* Delivery Name (Conditionally rendered) */}
+          {displayOptions.deliveryName && (
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Delivery Name</label>
+              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                <input 
+                  type="text" 
+                  placeholder="Delivery Name" 
+                  value={deliveryName}
+                  onChange={(e) => setDeliveryName(e.target.value)}
+                  style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 13 }}
+                />
+                <button style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-elevated)', cursor: 'pointer', color: 'var(--text-primary)', display: 'flex', alignItems: 'center' }}>
+                  <Plus size={14} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Counter */}
+          <div>
+            <label style={{ fontSize: 11, color: '#ef4444', fontWeight: 700 }}>Counter *</label>
+            <select 
+              value={counter}
+              onChange={(e) => setCounter(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', marginTop: 4, borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 13 }}
+            >
+              <option value="Muthu Kumaran Jewellery">Muthu Kumaran Jewellery</option>
+              <option value="Main Showroom Counter">Main Showroom Counter</option>
+              <option value="Silver Counter 1">Silver Counter 1</option>
+            </select>
+          </div>
+
+          {/* Sales Person */}
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Sales Person</label>
             <input 
               type="text" 
-              placeholder="Scan Barcode Tag # or Search Silver Item (e.g. SLV-1001)..." 
-              value={tagQuery}
-              onChange={(e) => setTagQuery(e.target.value)}
-              style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 13 }}
+              placeholder="Sales Person" 
+              value={salesPerson}
+              onChange={(e) => setSalesPerson(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', marginTop: 4, borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 13 }}
             />
-            {tagQuery && (
-              <div style={{ position: 'relative' }}>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Grid Layout: Left Column (Table & Scrap Exchange), Right Column (Financial Summary) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 24 }}>
+        
+        {/* Left Column */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+          {/* Barcode Tag Scan Input (Conditionally rendered) */}
+          {displayOptions.enableTagging && (
+            <div style={{ marginBottom: 16, position: 'relative' }}>
+              <input 
+                type="text" 
+                placeholder="Enter or Scan Tag Code" 
+                value={tagQuery}
+                onChange={(e) => setTagQuery(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 13 }}
+              />
+              {tagQuery && (
                 <div style={{
-                  position: 'absolute', top: 36, right: 0, width: 340, background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 100, padding: 8
+                  position: 'absolute', top: 42, left: 0, width: 340, background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 100, padding: 8
                 }}>
                   {stockList.filter(s => s.tagNumber.toLowerCase().includes(tagQuery.toLowerCase()) || s.title.toLowerCase().includes(tagQuery.toLowerCase())).map(st => (
                     <div 
@@ -281,52 +591,156 @@ export default function SilverRetailInvoice() {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
-          {/* Silver Calculation Table */}
-          <div className="card" style={{ padding: 20, borderRadius: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          {/* Main Items Table Grid */}
+          <div className="card" style={{ padding: 16, borderRadius: 12, marginBottom: 20, overflowX: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
                 ✨ Silver Items Billing Grid
               </h3>
               <button 
                 onClick={addItemRow}
-                style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #38bdf8, #0284c7)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #06b6d4, #0284c7)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
               >
                 <Plus size={14} /> Add Silver Item
               </button>
             </div>
 
-            <table className="data-table" style={{ width: '100%', fontSize: 12 }}>
+            <table className="data-table" style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
               <thead>
-                <tr>
-                  <th>Item / Tag</th>
-                  <th style={{ width: 80 }}>Purity</th>
-                  <th style={{ width: 85 }}>Gross Wt (g)</th>
-                  <th style={{ width: 80 }}>Stone Wt (g)</th>
-                  <th style={{ width: 80 }}>Net Wt (g)</th>
-                  <th style={{ width: 75 }}>Wast %</th>
-                  <th style={{ width: 85 }}>Fine Wt (g)</th>
-                  <th style={{ width: 85 }}>MC (₹/g)</th>
-                  <th style={{ width: 90 }}>Rate (₹/g)</th>
-                  <th style={{ width: 95 }}>Item Total</th>
-                  <th style={{ width: 40 }}></th>
+                <tr style={{ background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border-default)' }}>
+                  <th style={{ width: 36, padding: '10px 6px', textAlign: 'center' }}>#</th>
+                  {displayOptions.enableTagging && <th style={{ width: 100, padding: '10px 8px' }}>Tag</th>}
+                  {displayOptions.productGroup && <th style={{ width: 130, padding: '10px 8px' }}>Product Group</th>}
+                  <th style={{ padding: '10px 8px' }}>Product</th>
+                  {displayOptions.hsn && <th style={{ width: 80, padding: '10px 8px' }}>HSN</th>}
+                  <th style={{ width: 60, padding: '10px 8px' }}>Qty</th>
+                  <th style={{ width: 85, padding: '10px 8px' }}>Gross Wt</th>
+                  {displayOptions.stoneWeight && <th style={{ width: 80, padding: '10px 8px' }}>Stone Wt</th>}
+                  {displayOptions.netWeight && <th style={{ width: 80, padding: '10px 8px' }}>Net Wt</th>}
+                  <th style={{ width: 80, padding: '10px 8px' }}>Wst.Type</th>
+                  <th style={{ width: 75, padding: '10px 8px' }}>Wst</th>
+                  {displayOptions.mcPer && <th style={{ width: 80, padding: '10px 8px' }}>Mc/Per</th>}
+                  {displayOptions.mcAmt && <th style={{ width: 80, padding: '10px 8px' }}>Mc.Amt</th>}
+                  {displayOptions.stAmt && <th style={{ width: 80, padding: '10px 8px' }}>St.Amt</th>}
+                  <th style={{ width: 90, padding: '10px 8px' }}>Rate</th>
+                  <th style={{ width: 100, padding: '10px 8px', textAlign: 'right' }}>Total</th>
+                  <th style={{ width: 40, padding: '10px 4px' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {calculatedItems.map((item, idx) => (
-                  <tr key={item.id}>
-                    <td>
-                      <input 
-                        type="text" 
+                  <tr key={item.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                    {/* Row checkbox / index */}
+                    <td style={{ textAlign: 'center', padding: '6px' }}>
+                      <input type="checkbox" style={{ cursor: 'pointer' }} />
+                    </td>
+
+                    {/* Tag Column */}
+                    {displayOptions.enableTagging && (
+                      <td style={{ padding: '6px 4px' }}>
+                        <input 
+                          type="text" 
+                          placeholder="Tag #"
+                          value={item.tagNumber} 
+                          onChange={(e) => updateItemField(idx, 'tagNumber', e.target.value)}
+                          style={{ width: '100%', padding: '6px 6px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12 }}
+                        />
+                      </td>
+                    )}
+
+                    {/* Product Group Column */}
+                    {displayOptions.productGroup && (
+                      <td style={{ padding: '6px 4px' }}>
+                        <select 
+                          value={item.productGroup}
+                          onChange={(e) => updateItemField(idx, 'productGroup', e.target.value)}
+                          style={{ width: '100%', padding: '6px 4px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12 }}
+                        >
+                          <option value="">Product Group</option>
+                          <option value="Silver Ornaments">Silver Ornaments</option>
+                          <option value="Silver Coins">Silver Coins</option>
+                          <option value="Silver Utensils">Silver Utensils</option>
+                          <option value="Silver Payal">Silver Payal</option>
+                        </select>
+                      </td>
+                    )}
+
+                    {/* Product / Title */}
+                    <td style={{ padding: '6px 4px' }}>
+                      <select 
                         value={item.title} 
                         onChange={(e) => updateItemField(idx, 'title', e.target.value)}
-                        style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12 }}
+                        style={{ width: '100%', padding: '6px 4px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12 }}
+                      >
+                        <option value="">Product</option>
+                        <option value="Silver Chain">Silver Chain</option>
+                        <option value="Silver Ring">Silver Ring</option>
+                        <option value="Silver Bracelet">Silver Bracelet</option>
+                        <option value="Silver Anklet (Payal)">Silver Anklet (Payal)</option>
+                        <option value="Silver Coin 999">Silver Coin 999</option>
+                      </select>
+                    </td>
+
+                    {/* HSN Column */}
+                    {displayOptions.hsn && (
+                      <td style={{ padding: '6px 4px' }}>
+                        <input 
+                          type="text" 
+                          placeholder="HSN"
+                          value={item.hsn} 
+                          onChange={(e) => updateItemField(idx, 'hsn', e.target.value)}
+                          style={{ width: '100%', padding: '6px 6px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12 }}
+                        />
+                      </td>
+                    )}
+
+                    {/* Qty */}
+                    <td style={{ padding: '6px 4px' }}>
+                      <input 
+                        type="number" 
+                        value={item.qty} 
+                        onChange={(e) => updateItemField(idx, 'qty', e.target.value)}
+                        style={{ width: '100%', padding: '6px 4px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12, textAlign: 'center' }}
                       />
                     </td>
-                    <td>
+
+                    {/* Gross Weight */}
+                    <td style={{ padding: '6px 4px' }}>
+                      <input 
+                        type="number" 
+                        step="0.001"
+                        value={item.grossWeight || ''} 
+                        onChange={(e) => updateItemField(idx, 'grossWeight', e.target.value)}
+                        style={{ width: '100%', padding: '6px 6px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontWeight: 600, fontSize: 12 }}
+                      />
+                    </td>
+
+                    {/* Stone Weight Column */}
+                    {displayOptions.stoneWeight && (
+                      <td style={{ padding: '6px 4px' }}>
+                        <input 
+                          type="number" 
+                          step="0.001"
+                          value={item.stoneWeight || ''} 
+                          onChange={(e) => updateItemField(idx, 'stoneWeight', e.target.value)}
+                          style={{ width: '100%', padding: '6px 6px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12 }}
+                        />
+                      </td>
+                    )}
+
+                    {/* Net Weight Column */}
+                    {displayOptions.netWeight && (
+                      <td style={{ padding: '6px 8px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {item.netWeight.toFixed(3)}
+                      </td>
+                    )}
+
+                    {/* Wastage Type / Purity */}
+                    <td style={{ padding: '6px 4px' }}>
                       <select 
                         value={item.purity}
                         onChange={(e) => handlePurityChange(idx, e.target.value)}
@@ -337,61 +751,75 @@ export default function SilverRetailInvoice() {
                         <option value={80.0}>800 Util</option>
                       </select>
                     </td>
-                    <td>
-                      <input 
-                        type="number" 
-                        step="0.01"
-                        value={item.grossWeight} 
-                        onChange={(e) => updateItemField(idx, 'grossWeight', e.target.value)}
-                        style={{ width: '100%', padding: '6px 6px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: '#f8fafc', fontWeight: 700, fontSize: 12 }}
-                      />
-                    </td>
-                    <td>
-                      <input 
-                        type="number" 
-                        step="0.01"
-                        value={item.stoneWeight} 
-                        onChange={(e) => updateItemField(idx, 'stoneWeight', e.target.value)}
-                        style={{ width: '100%', padding: '6px 6px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12 }}
-                      />
-                    </td>
-                    <td style={{ fontWeight: 700, color: '#f8fafc' }}>
-                      {item.netWeight.toFixed(2)}
-                    </td>
-                    <td>
+
+                    {/* Wastage % */}
+                    <td style={{ padding: '6px 4px' }}>
                       <input 
                         type="number" 
                         step="0.1"
-                        value={item.wastagePercent} 
+                        value={item.wastagePercent || ''} 
                         onChange={(e) => updateItemField(idx, 'wastagePercent', e.target.value)}
                         style={{ width: '100%', padding: '6px 6px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12 }}
                       />
                     </td>
-                    <td style={{ fontWeight: 700, color: '#38bdf8' }}>
-                      {item.fineWeight.toFixed(2)}
-                    </td>
-                    <td>
-                      <input 
-                        type="number" 
-                        step="1"
-                        value={item.makingChargePerGram} 
-                        onChange={(e) => updateItemField(idx, 'makingChargePerGram', e.target.value)}
-                        style={{ width: '100%', padding: '6px 6px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12 }}
-                      />
-                    </td>
-                    <td>
+
+                    {/* Mc/Per Column */}
+                    {displayOptions.mcPer && (
+                      <td style={{ padding: '6px 4px' }}>
+                        <input 
+                          type="number" 
+                          step="1"
+                          value={item.makingChargePerGram || ''} 
+                          onChange={(e) => updateItemField(idx, 'makingChargePerGram', e.target.value)}
+                          style={{ width: '100%', padding: '6px 6px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12 }}
+                        />
+                      </td>
+                    )}
+
+                    {/* Mc.Amt Column */}
+                    {displayOptions.mcAmt && (
+                      <td style={{ padding: '6px 4px' }}>
+                        <input 
+                          type="number" 
+                          step="1"
+                          value={item.flatMakingCharge || ''} 
+                          onChange={(e) => updateItemField(idx, 'flatMakingCharge', e.target.value)}
+                          style={{ width: '100%', padding: '6px 6px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12 }}
+                        />
+                      </td>
+                    )}
+
+                    {/* St.Amt Column */}
+                    {displayOptions.stAmt && (
+                      <td style={{ padding: '6px 4px' }}>
+                        <input 
+                          type="number" 
+                          step="1"
+                          value={item.stoneAmount || ''} 
+                          onChange={(e) => updateItemField(idx, 'stoneAmount', e.target.value)}
+                          style={{ width: '100%', padding: '6px 6px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12 }}
+                        />
+                      </td>
+                    )}
+
+                    {/* Rate */}
+                    <td style={{ padding: '6px 4px' }}>
                       <input 
                         type="number" 
                         step="0.1"
-                        value={item.ratePerGram} 
+                        value={item.ratePerGram || ''} 
                         onChange={(e) => updateItemField(idx, 'ratePerGram', e.target.value)}
                         style={{ width: '100%', padding: '6px 6px', borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--bg-subtle)', color: 'var(--text-primary)', fontSize: 12 }}
                       />
                     </td>
-                    <td style={{ fontWeight: 800, color: '#34d399' }}>
-                      ₹ {item.totalAmount.toLocaleString('en-IN')}
+
+                    {/* Total */}
+                    <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {item.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
-                    <td>
+
+                    {/* Delete Row */}
+                    <td style={{ padding: '6px 4px', textAlign: 'center' }}>
                       <button 
                         onClick={() => removeItemRow(idx)}
                         style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
@@ -401,6 +829,29 @@ export default function SilverRetailInvoice() {
                     </td>
                   </tr>
                 ))}
+
+                {/* Grid Totals Row */}
+                <tr style={{ background: 'var(--bg-subtle)', fontWeight: 700, borderTop: '2px solid var(--border-default)' }}>
+                  <td>Total</td>
+                  {displayOptions.enableTagging && <td></td>}
+                  {displayOptions.productGroup && <td></td>}
+                  <td></td>
+                  {displayOptions.hsn && <td></td>}
+                  <td style={{ textAlign: 'center' }}>{totalQty}</td>
+                  <td>{totalGrossWt.toFixed(3)}</td>
+                  {displayOptions.stoneWeight && <td>{totalStoneWt.toFixed(3)}</td>}
+                  {displayOptions.netWeight && <td>{totalNetWt.toFixed(3)}</td>}
+                  <td></td>
+                  <td>{totalFineWt.toFixed(3)}</td>
+                  {displayOptions.mcPer && <td></td>}
+                  {displayOptions.mcAmt && <td></td>}
+                  {displayOptions.stAmt && <td></td>}
+                  <td></td>
+                  <td style={{ textAlign: 'right', color: '#06b6d4', fontSize: 13 }}>
+                    ₹ {grossSubtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td></td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -477,9 +928,10 @@ export default function SilverRetailInvoice() {
               </div>
             )}
           </div>
+
         </div>
 
-        {/* Right Side: Financial Summary Panel */}
+        {/* Right Column: Financial Summary Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="card" style={{ padding: 24, borderRadius: 18, background: 'linear-gradient(135deg, rgba(30,41,59,0.95), rgba(15,23,42,0.98))', border: '1px solid rgba(148,163,184,0.25)' }}>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#f8fafc', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 12 }}>
@@ -556,6 +1008,7 @@ export default function SilverRetailInvoice() {
             </button>
           </div>
         </div>
+
       </div>
 
       {/* Tax Invoice Print Preview Modal - DK Nova Technologies */}
@@ -671,6 +1124,7 @@ export default function SilverRetailInvoice() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

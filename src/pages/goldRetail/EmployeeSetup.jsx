@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { supabaseAPI } from '../../db/supabaseAPI';
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -36,8 +37,8 @@ export default function EmployeeSetup() {
     const loadAll = useCallback(async () => {
         try {
             const [emps, rls] = await Promise.all([
-                window.electronAPI?.getAllEmployees() || [],
-                window.electronAPI?.getAllRoles() || [],
+                supabaseAPI.getAllEmployees() || [],
+                supabaseAPI.getAllRoles() || [],
             ]);
             setEmployees(emps);
             setRoles(rls);
@@ -69,10 +70,10 @@ export default function EmployeeSetup() {
         try {
             const data = { ...form, monthlySalary: parseFloat(form.monthlySalary) || 0, otRate: parseFloat(form.otRate) || 0 };
             if (editingId) {
-                await window.electronAPI?.updateEmployee(editingId, data);
+                await supabaseAPI.updateEmployee(editingId, data);
                 showToast('Employee updated successfully');
             } else {
-                await window.electronAPI?.saveEmployee(data);
+                await supabaseAPI.saveEmployee(data);
                 showToast('Employee added successfully');
             }
             await loadAll();
@@ -85,7 +86,7 @@ export default function EmployeeSetup() {
     const deleteEmployee = async (id, name) => {
         if (!window.confirm(`Delete ${name}? All attendance records will be removed.`)) return;
         try {
-            await window.electronAPI?.deleteEmployee(id);
+            await supabaseAPI.deleteEmployee(id);
             await loadAll();
             showToast('Employee removed');
         } catch (e) { console.error(e); }
@@ -95,7 +96,7 @@ export default function EmployeeSetup() {
         if (!newRoleName.trim()) return;
         setAddingRole(true);
         try {
-            await window.electronAPI?.addRole(newRoleName.trim());
+            await supabaseAPI.addRole(newRoleName.trim());
             setNewRoleName('');
             await loadAll();
         } catch (e) { console.error(e); }
@@ -105,7 +106,7 @@ export default function EmployeeSetup() {
     const deleteRole = async (roleId, roleName) => {
         if (!window.confirm(`Remove role "${roleName}"?`)) return;
         try {
-            await window.electronAPI?.deleteRole(roleId);
+            await supabaseAPI.deleteRole(roleId);
             await loadAll();
         } catch (e) { console.error(e); }
     };
@@ -116,7 +117,7 @@ export default function EmployeeSetup() {
         const emp = employees.find(e => e.id === editShift.empId);
         if (!emp) return;
         try {
-            await window.electronAPI?.updateEmployee(editShift.empId, {
+            await supabaseAPI.updateEmployee(editShift.empId, {
                 ...emp, shiftStart: editShift.shiftStart, shiftEnd: editShift.shiftEnd,
             });
             await loadAll();

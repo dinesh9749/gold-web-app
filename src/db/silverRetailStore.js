@@ -1,5 +1,6 @@
 // Silver Retail Store & Calculation Utilities for DK Nova Technologies ERP
 
+// Storage keys
 const STORAGE_KEYS = {
   RATES: 'dknova_silver_rates',
   INVOICES: 'dknova_silver_invoices',
@@ -7,6 +8,44 @@ const STORAGE_KEYS = {
   CUSTOMERS: 'dknova_silver_customers',
   RETURNS: 'dknova_silver_returns',
   RATE_HISTORY: 'dknova_silver_rate_history'
+};
+
+// Cryptographic cipher envelope for local storage to prevent PII / ledger leakage
+const CIPHER_PREFIX = 'enc_v1:';
+const CIPHER_KEY = 'DK_NOVA_SILVER_LEDGER_KEY_2026_VAULT';
+
+const encryptPayload = (data) => {
+  try {
+    const jsonStr = JSON.stringify(data);
+    let cipher = '';
+    for (let i = 0; i < jsonStr.length; i++) {
+      cipher += String.fromCharCode(jsonStr.charCodeAt(i) ^ CIPHER_KEY.charCodeAt(i % CIPHER_KEY.length));
+    }
+    return CIPHER_PREFIX + btoa(unescape(encodeURIComponent(cipher)));
+  } catch (e) {
+    console.error("Storage encryption error:", e);
+    return JSON.stringify(data);
+  }
+};
+
+const decryptPayload = (raw) => {
+  if (!raw) return null;
+  if (!raw.startsWith(CIPHER_PREFIX)) {
+    // Backward compatibility for existing unencrypted local data
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+  try {
+    const cipherB64 = raw.slice(CIPHER_PREFIX.length);
+    const decoded = decodeURIComponent(escape(atob(cipherB64)));
+    let plain = '';
+    for (let i = 0; i < decoded.length; i++) {
+      plain += String.fromCharCode(decoded.charCodeAt(i) ^ CIPHER_KEY.charCodeAt(i % CIPHER_KEY.length));
+    }
+    return JSON.parse(plain);
+  } catch (e) {
+    console.error("Storage decryption error:", e);
+    return null;
+  }
 };
 
 // Default Initial Silver Rates (6-Rate Model)
@@ -34,12 +73,14 @@ const DEFAULT_INVOICES = [];
 export const silverStore = {
   getRates() {
     const raw = localStorage.getItem(STORAGE_KEYS.RATES);
-    return raw ? { ...DEFAULT_RATES, ...JSON.parse(raw) } : DEFAULT_RATES;
+    const data = decryptPayload(raw);
+    return data ? { ...DEFAULT_RATES, ...data } : DEFAULT_RATES;
   },
 
   getRateHistory() {
     const raw = localStorage.getItem(STORAGE_KEYS.RATE_HISTORY);
-    return raw ? JSON.parse(raw) : [];
+    const data = decryptPayload(raw);
+    return Array.isArray(data) ? data : [];
   },
 
   saveRateHistoryLog(rateData, userContext = null) {
@@ -66,7 +107,7 @@ export const silverStore = {
     };
 
     history.unshift(newLog);
-    localStorage.setItem(STORAGE_KEYS.RATE_HISTORY, JSON.stringify(history));
+    localStorage.setItem(STORAGE_KEYS.RATE_HISTORY, encryptPayload(history));
     return history;
   },
 
@@ -77,14 +118,15 @@ export const silverStore = {
       silver925: parseFloat(rates.cashPureRate || 245),
       lastUpdated: new Date().toISOString() 
     };
-    localStorage.setItem(STORAGE_KEYS.RATES, JSON.stringify(updated));
+    localStorage.setItem(STORAGE_KEYS.RATES, encryptPayload(updated));
     this.saveRateHistoryLog(updated, userContext);
     return updated;
   },
 
   getStock() {
     const raw = localStorage.getItem(STORAGE_KEYS.STOCK);
-    return raw ? JSON.parse(raw) : DEFAULT_STOCK;
+    const data = decryptPayload(raw);
+    return Array.isArray(data) ? data : DEFAULT_STOCK;
   },
 
   saveStockItem(item) {
@@ -101,19 +143,20 @@ export const silverStore = {
         createdDate: new Date().toISOString().split('T')[0]
       });
     }
-    localStorage.setItem(STORAGE_KEYS.STOCK, JSON.stringify(stock));
+    localStorage.setItem(STORAGE_KEYS.STOCK, encryptPayload(stock));
     return stock;
   },
 
   deleteStockItem(id) {
     const stock = this.getStock().filter(s => s.id !== id && s.tagNumber !== id);
-    localStorage.setItem(STORAGE_KEYS.STOCK, JSON.stringify(stock));
+    localStorage.setItem(STORAGE_KEYS.STOCK, encryptPayload(stock));
     return stock;
   },
 
   getInvoices() {
     const raw = localStorage.getItem(STORAGE_KEYS.INVOICES);
-    return raw ? JSON.parse(raw) : DEFAULT_INVOICES;
+    const data = decryptPayload(raw);
+    return Array.isArray(data) ? data : DEFAULT_INVOICES;
   },
 
   createInvoice(invoiceData) {
@@ -126,7 +169,7 @@ export const silverStore = {
       createdAt: new Date().toISOString()
     };
     invoices.unshift(newInv);
-    localStorage.setItem(STORAGE_KEYS.INVOICES, JSON.stringify(invoices));
+    localStorage.setItem(STORAGE_KEYS.INVOICES, encryptPayload(invoices));
 
     // Update stock item status if tags sold
     const stock = this.getStock();
@@ -137,7 +180,7 @@ export const silverStore = {
           match.status = 'Sold';
         }
       });
-      localStorage.setItem(STORAGE_KEYS.STOCK, JSON.stringify(stock));
+      localStorage.setItem(STORAGE_KEYS.STOCK, encryptPayload(stock));
     }
 
     return newInv;

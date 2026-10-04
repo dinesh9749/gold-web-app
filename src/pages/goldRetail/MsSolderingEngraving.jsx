@@ -117,7 +117,7 @@ export default function MsSolderingEngraving() {
   const loadJobsAndSequence = async () => {
     try {
       setLoading(true);
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       const [settingsRes, invRes, soldRes] = await Promise.all([
         api?.getOrganizationSettings ? api.getOrganizationSettings() : Promise.resolve(null),
         api?.getAllInvoices ? api.getAllInvoices() : Promise.resolve([]),
@@ -239,7 +239,7 @@ export default function MsSolderingEngraving() {
         totalAmount: totalVal
       };
 
-      const api = window.electronAPI || supabaseAPI;
+      const api = supabaseAPI;
       const result = api?.saveSolderingJob ? await api.saveSolderingJob(payload) : null;
       if (result?.id) {
         const savedInvoiceNo = result.invoiceNo || invoiceNo;
@@ -294,7 +294,7 @@ export default function MsSolderingEngraving() {
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this job record permanently?")) {
       try {
-        const api = window.electronAPI || supabaseAPI;
+        const api = supabaseAPI;
         if (api?.deleteSolderingJob) {
           await api.deleteSolderingJob(id);
         }
