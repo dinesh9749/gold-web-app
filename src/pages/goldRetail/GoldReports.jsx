@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabaseAPI } from '../../db/supabaseAPI';
+import * as XLSX from 'xlsx';
 
 export default function GoldReports() {
   const [loading, setLoading] = useState(true);
@@ -278,6 +279,65 @@ export default function GoldReports() {
     };
   }, [filteredInvoices, filteredReceipts, filteredSalesOrders, filteredStockItems, filteredDigiGold, filteredSolderingJobs]);
 
+  // Global master invoice map calculated chronologically across all historical invoices and soldering jobs
+  const masterInvoiceMap = useMemo(() => {
+    const map = {};
+    try {
+      const combinedAll = [];
+      (invoices || []).forEach(inv => {
+        const rawDate = inv.createdAt || inv.created_at || inv.date || '';
+        const t = new Date(rawDate).getTime();
+        combinedAll.push({
+          id: inv.id,
+          rawNo: inv.invoiceNo || inv.invoiceNumber || null,
+          time: isNaN(t) ? 0 : t,
+          source: 'Invoice'
+        });
+      });
+
+      (solderingJobs || []).forEach(job => {
+        const rawDate = job.createdAt || job.created_at || job.date || '';
+        const t = new Date(rawDate).getTime();
+        combinedAll.push({
+          id: job.id,
+          rawNo: job.invoiceNo || job.invoiceNumber || job.receiptNo || null,
+          time: isNaN(t) ? 0 : t,
+          source: 'Soldering'
+        });
+      });
+
+      // Sort all-time items chronologically (oldest first)
+      combinedAll.sort((a, b) => (a.time || 0) - (b.time || 0));
+
+      const usedInvoiceNos = new Set();
+      let currentSeqNum = 1001;
+
+      combinedAll.forEach(item => {
+        let finalNo = item.rawNo != null ? String(item.rawNo).trim() : '';
+        if (!finalNo || finalNo.startsWith('#') || finalNo.length > 20 || usedInvoiceNos.has(finalNo)) {
+          while (usedInvoiceNos.has(`INV-${currentSeqNum}`)) {
+            currentSeqNum++;
+          }
+          finalNo = `INV-${currentSeqNum}`;
+          currentSeqNum++;
+        } else {
+          const match = finalNo.match(/(\d+)/);
+          if (match) {
+            const n = parseInt(match[1], 10);
+            if (n >= currentSeqNum) currentSeqNum = n + 1;
+          }
+        }
+        usedInvoiceNos.add(finalNo);
+        if (item.id) {
+          map[item.id] = finalNo;
+        }
+      });
+    } catch (e) {
+      console.error('Error generating master invoice map:', e);
+    }
+    return map;
+  }, [invoices, solderingJobs]);
+
   // Unified Combined GST Filing Ledger (Invoices + Soldering Jobs sorted by Invoice Number)
   const combinedGstLedger = useMemo(() => {
     const combinedRaw = [];
@@ -322,11 +382,13 @@ export default function GoldReports() {
         }
       }
 
+      const assignedNo = inv.invoiceNo || inv.invoiceNumber || (inv.id && masterInvoiceMap[inv.id]) || null;
+
       combinedRaw.push({
         id: inv.id || `inv-${idx}`,
         source: 'Invoice',
         typeLabel: 'Gold Retail Sale',
-        rawInvoiceNo: inv.invoiceNo || inv.invoiceNumber || null,
+        rawInvoiceNo: assignedNo,
         date: formatDate(inv.createdAt || inv.created_at || inv.date),
         rawTime: new Date(rawDate).getTime() || 0,
         customerName: inv.customerName || 'Walk-in Customer',
@@ -348,12 +410,13 @@ export default function GoldReports() {
       const gst = parseFloat(job.gstAmount ?? job.gst_amount ?? (marking * 0.05) ?? 0);
       const total = parseFloat(job.totalAmount ?? job.total_amount ?? (marking + gst) ?? 0);
       const rawDate = job.createdAt || job.created_at || job.date || '';
+      const assignedNo = job.invoiceNo || job.invoiceNumber || job.receiptNo || (job.id && masterInvoiceMap[job.id]) || null;
 
       combinedRaw.push({
         id: job.id || `job-${idx}`,
         source: 'Soldering',
         typeLabel: 'Soldering & Engraving',
-        rawInvoiceNo: job.invoiceNo || job.invoiceNumber || job.receiptNo || null,
+        rawInvoiceNo: assignedNo,
         date: formatDate(job.createdAt || job.created_at || job.date),
         rawTime: new Date(rawDate).getTime() || 0,
         customerName: job.customerName || job.customer_name || '—',
@@ -369,35 +432,15 @@ export default function GoldReports() {
       });
     });
 
-    // Sort chronologically by creation timestamp (oldest first)
-    combinedRaw.sort((a, b) => (a.rawTime || 0) - (b.rawTime || 0));
-
-    // Assign continuous non-colliding invoice numbers
-    const usedInvoiceNos = new Set();
-    let currentSeqNum = 1001;
-
+    // Map each item to its persistent sequential invoice number
     const list = combinedRaw.map(item => {
       let finalNo = item.rawInvoiceNo != null ? String(item.rawInvoiceNo).trim() : '';
-      
-      // If missing or duplicate or raw UUID prefix (#...), assign next continuous sequence number
-      if (!finalNo || finalNo.startsWith('#') || finalNo.length > 20 || usedInvoiceNos.has(finalNo)) {
-        while (usedInvoiceNos.has(`INV-${currentSeqNum}`)) {
-          currentSeqNum++;
-        }
-        finalNo = `INV-${currentSeqNum}`;
-        currentSeqNum++;
-      } else {
-        const match = finalNo.match(/(\d+)/);
-        if (match) {
-          const n = parseInt(match[1], 10);
-          if (n >= currentSeqNum) currentSeqNum = n + 1;
-        }
+      if (!finalNo || finalNo.startsWith('#') || finalNo.length > 20) {
+        finalNo = (item.id && masterInvoiceMap[item.id]) || '';
       }
-      usedInvoiceNos.add(finalNo);
-
       return {
         ...item,
-        invoiceNo: finalNo
+        invoiceNo: finalNo || '—'
       };
     });
 
@@ -410,11 +453,11 @@ export default function GoldReports() {
         const numB = parseInt(matchB[1], 10);
         if (numA !== numB) return numA - numB;
       }
-      return String(a.invoiceNo).localeCompare(String(b.invoiceNo));
+      return (a.rawTime || 0) - (b.rawTime || 0);
     });
 
     return list;
-  }, [filteredInvoices, filteredSolderingJobs]);
+  }, [filteredInvoices, filteredSolderingJobs, masterInvoiceMap]);
 
   const gstStats = useMemo(() => {
     let totalTaxable = 0;
@@ -486,6 +529,195 @@ export default function GoldReports() {
     document.body.removeChild(link);
   };
 
+  // Export Combined GST Report to Excel (.xlsx) Handler
+  const handleExportGSTReportExcel = () => {
+    try {
+      const wb = XLSX.utils.book_new();
+
+      // --- SHEET 1: COMBINED GST INVOICE LEDGER ---
+      const summaryAOA = [
+        ['DK Nova Technologies - Combined GST Filing Report'],
+        [`Generated On: ${new Date().toLocaleString()}`],
+        [`Filter Range: ${dateRangeOption.toUpperCase()}`],
+        [],
+        ['--- GST SUMMARY TOTALS ---', ''],
+        ['Total Tax Invoices Count', gstStats.count],
+        ['Total Taxable Value (₹)', Number(gstStats.totalTaxable.toFixed(2))],
+        ['Total CGST Collected (₹)', Number(gstStats.totalCgst.toFixed(2))],
+        ['Total SGST Collected (₹)', Number(gstStats.totalSgst.toFixed(2))],
+        ['Total GST Liability (₹)', Number(gstStats.totalGst.toFixed(2))],
+        ['Total Invoiced Amount (₹)', Number(gstStats.totalGrand.toFixed(2))],
+        [],
+        [
+          'Invoice No',
+          'Date',
+          'Document Type',
+          'HSN/SAC',
+          'Customer Name',
+          'Taxable Value (₹)',
+          'GST Rate',
+          'CGST (₹)',
+          'SGST (₹)',
+          'Total GST (₹)',
+          'Invoice Total (₹)',
+          'Payment Mode'
+        ]
+      ];
+
+      combinedGstLedger.forEach(item => {
+        summaryAOA.push([
+          item.invoiceNo,
+          item.date,
+          item.typeLabel,
+          item.hsnSac,
+          item.customerName,
+          Number(item.taxableAmount.toFixed(2)),
+          item.gstRateLabel,
+          Number(item.cgstAmount.toFixed(2)),
+          Number(item.sgstAmount.toFixed(2)),
+          Number(item.totalGstAmount.toFixed(2)),
+          Number(item.grandTotal.toFixed(2)),
+          item.paymentMode || 'Cash'
+        ]);
+      });
+
+      // Total summary row
+      summaryAOA.push([
+        'TOTAL',
+        '',
+        '',
+        '',
+        '',
+        Number(gstStats.totalTaxable.toFixed(2)),
+        '',
+        Number(gstStats.totalCgst.toFixed(2)),
+        Number(gstStats.totalSgst.toFixed(2)),
+        Number(gstStats.totalGst.toFixed(2)),
+        Number(gstStats.totalGrand.toFixed(2)),
+        ''
+      ]);
+
+      const wsLedger = XLSX.utils.aoa_to_sheet(summaryAOA);
+      wsLedger['!cols'] = [
+        { wch: 16 }, // Invoice No
+        { wch: 14 }, // Date
+        { wch: 24 }, // Document Type
+        { wch: 12 }, // HSN/SAC
+        { wch: 28 }, // Customer Name
+        { wch: 18 }, // Taxable Value
+        { wch: 26 }, // GST Rate
+        { wch: 14 }, // CGST
+        { wch: 14 }, // SGST
+        { wch: 16 }, // Total GST
+        { wch: 18 }, // Invoice Total
+        { wch: 18 }  // Payment Mode
+      ];
+      XLSX.utils.book_append_sheet(wb, wsLedger, 'GST Invoice Ledger');
+
+      // --- SHEET 2: DETAILED ITEM-LEVEL BREAKDOWN ---
+      const itemsAOA = [
+        [
+          'Invoice No',
+          'Date',
+          'Customer Name',
+          'Document Type',
+          'Description / Product',
+          'HSN/SAC',
+          'Net Wt (g)',
+          'Wastage %',
+          'Stone Wt (g)',
+          'Gross Wt (g)',
+          'Rate / g (₹)',
+          'Making / Marking Charge (₹)',
+          'GST (₹)',
+          'Total Charge (₹)'
+        ]
+      ];
+
+      combinedGstLedger.forEach(item => {
+        if (item.source === 'Invoice') {
+          const rawInv = item.rawInvoice;
+          const itemsList = Array.isArray(rawInv?.items) && rawInv.items.length > 0 ? rawInv.items : [
+            { description: 'Gold Jewellery Ornament', hsnCode: '7113', netWeight: 0, wastagePct: 0, stoneWeight: 0, ratePerGram: 0, makingCharges: 0, amount: item.taxableAmount }
+          ];
+          itemsList.forEach(it => {
+            const nw = Number(it.netWeight || it.net_weight) || 0;
+            const wp = Number(it.wastagePct || it.wastage_pct) || 0;
+            const sw = Number(it.stoneWeight || it.stone_weight) || 0;
+            const gross = Math.max(0, nw * (1 + wp / 100) - sw);
+            const rate = Number(it.rate || it.ratePerGram || it.rate_per_gram) || 0;
+            const making = Number(it.makingCharges || it.making_charges) || 0;
+            const amt = Number(it.amount) || 0;
+            itemsAOA.push([
+              item.invoiceNo,
+              item.date,
+              item.customerName,
+              item.typeLabel,
+              it.description || 'Gold Ornament',
+              it.hsnCode || it.hsn_code || item.hsnSac || '7113',
+              nw ? Number(nw.toFixed(3)) : '',
+              wp ? Number(wp.toFixed(2)) : '',
+              sw ? Number(sw.toFixed(3)) : '',
+              gross ? Number(gross.toFixed(3)) : '',
+              rate ? Number(rate.toFixed(2)) : '',
+              making ? Number(making.toFixed(2)) : '',
+              Number((amt * 0.03).toFixed(2)),
+              Number((amt * 1.03).toFixed(2))
+            ]);
+          });
+        } else {
+          // Soldering job item
+          const job = item.rawJob || {};
+          const marking = parseFloat(job.markingCharges ?? job.marking_charges ?? job.charge ?? job.amount ?? 0);
+          const gst = parseFloat(job.gstAmount ?? job.gst_amount ?? (marking * 0.05) ?? 0);
+          const total = parseFloat(job.totalAmount ?? job.total_amount ?? (marking + gst) ?? 0);
+          itemsAOA.push([
+            item.invoiceNo,
+            item.date,
+            item.customerName,
+            item.typeLabel,
+            job.product || job.ornament || 'Soldering & Engraving Service',
+            item.hsnSac || '7113',
+            '',
+            '',
+            '',
+            '',
+            '',
+            Number(marking.toFixed(2)),
+            Number(gst.toFixed(2)),
+            Number(total.toFixed(2))
+          ]);
+        }
+      });
+
+      const wsItems = XLSX.utils.aoa_to_sheet(itemsAOA);
+      wsItems['!cols'] = [
+        { wch: 16 }, // Invoice No
+        { wch: 14 }, // Date
+        { wch: 24 }, // Customer Name
+        { wch: 22 }, // Document Type
+        { wch: 30 }, // Description
+        { wch: 12 }, // HSN/SAC
+        { wch: 14 }, // Net Wt
+        { wch: 12 }, // Wastage %
+        { wch: 14 }, // Stone Wt
+        { wch: 14 }, // Gross Wt
+        { wch: 14 }, // Rate/g
+        { wch: 26 }, // Making/Marking
+        { wch: 14 }, // GST
+        { wch: 16 }  // Total Charge
+      ];
+      XLSX.utils.book_append_sheet(wb, wsItems, 'Invoice Item Details');
+
+      // Export file
+      const filename = `Combined_GST_Invoices_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(wb, filename);
+    } catch (err) {
+      console.error('Error exporting GST Report to Excel:', err);
+      alert('Failed to export Excel report: ' + err.message);
+    }
+  };
+
   // Export CSV Handler
   const handleExportCSV = () => {
     let csvRows = [];
@@ -511,7 +743,7 @@ export default function GoldReports() {
     csvRows.push(['Invoice No', 'Date', 'Customer Name', 'Payment Mode', 'GST', 'Grand Total']);
     filteredInvoices.forEach(inv => {
       csvRows.push([
-        inv.invoiceNumber || inv.invoiceNo || '—',
+        inv.invoiceNumber || inv.invoiceNo || (inv.id && masterInvoiceMap[inv.id]) || '—',
         formatDate(inv.createdAt || inv.created_at || inv.date),
         `"${inv.customerName || 'Walk-in'}"`,
         inv.paymentMode || inv.paymentType || 'Cash',
@@ -633,6 +865,9 @@ export default function GoldReports() {
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button onClick={() => setShowPdfPreviewModal(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
               📄 Export to PDF (A4)
+            </button>
+            <button onClick={handleExportGSTReportExcel} className="btn-primary" style={{ padding: '8px 14px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, background: '#16a34a', borderColor: '#15803d', color: '#ffffff' }}>
+              📊 Export to Excel (.xlsx)
             </button>
             <button onClick={handleExportCSV} className="btn-secondary" style={{ padding: '8px 14px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
               📥 Export CSV
@@ -889,7 +1124,7 @@ export default function GoldReports() {
                     <tbody>
                       {filteredInvoices.slice(0, 10).map((inv, idx) => (
                         <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                          <td style={{ padding: '10px 10px', fontWeight: 700, color: 'var(--gold-200)' }}>{inv.invoiceNumber || inv.invoiceNo || `INV-${idx+1}`}</td>
+                          <td style={{ padding: '10px 10px', fontWeight: 700, color: 'var(--gold-200)' }}>{inv.invoiceNumber || inv.invoiceNo || (inv.id && masterInvoiceMap[inv.id]) || '—'}</td>
                           <td style={{ padding: '10px 10px', color: 'var(--text-muted)' }}>{formatDate(inv.createdAt || inv.created_at || inv.date)}</td>
                           <td style={{ padding: '10px 10px', fontWeight: 600 }}>{inv.customerName || 'Walk-in Customer'}</td>
                           <td style={{ padding: '10px 10px' }}>
@@ -942,7 +1177,7 @@ export default function GoldReports() {
                   <tbody>
                     {filteredInvoices.map((inv, idx) => (
                       <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                        <td style={{ padding: '10px', fontWeight: 700, color: 'var(--gold-200)' }}>{inv.invoiceNumber || inv.invoiceNo || '—'}</td>
+                        <td style={{ padding: '10px', fontWeight: 700, color: 'var(--gold-200)' }}>{inv.invoiceNumber || inv.invoiceNo || (inv.id && masterInvoiceMap[inv.id]) || '—'}</td>
                         <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{formatDate(inv.createdAt || inv.created_at || inv.date)}</td>
                         <td style={{ padding: '10px', fontWeight: 600 }}>{inv.customerName || 'Walk-in'}</td>
                         <td style={{ padding: '10px', color: 'var(--text-muted)' }}>{inv.customerMobile || inv.mobile || '—'}</td>
@@ -1135,7 +1370,7 @@ export default function GoldReports() {
                       const total = parseFloat(job.totalAmount ?? job.total_amount ?? (marking + gst) ?? 0);
                       let invNo = job.invoiceNo || job.invoiceNumber || job.receiptNo;
                       if (!invNo || invNo.startsWith('#') || invNo.length > 20) {
-                        invNo = `INV-${1001 + (filteredSolderingJobs.length - 1 - idx)}`;
+                        invNo = (job.id && masterInvoiceMap[job.id]) || '—';
                       }
                       return (
                         <tr key={idx} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
@@ -1174,6 +1409,9 @@ export default function GoldReports() {
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <button onClick={() => setShowPdfPreviewModal(true)} className="btn-primary" style={{ padding: '8px 16px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
                       📄 Export to PDF (A4)
+                    </button>
+                    <button onClick={handleExportGSTReportExcel} className="btn-primary" style={{ padding: '8px 16px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, background: '#16a34a', borderColor: '#15803d', color: '#ffffff' }}>
+                      📊 Export to Excel (.xlsx)
                     </button>
                     <button onClick={handleExportGSTReportCSV} className="btn-secondary" style={{ padding: '8px 16px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
                       📥 Export GSTR-1 CSV

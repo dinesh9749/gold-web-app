@@ -555,7 +555,7 @@ export default function MsSolderingEngraving() {
                     const gst = parseFloat(job.gstAmount ?? job.gst_amount ?? (marking * 0.05) ?? 0);
                     const total = parseFloat(job.totalAmount ?? job.total_amount ?? (marking + gst) ?? 0);
                     
-                    const invNo = resolvedJobInvoiceNos[job.id] || job.invoiceNo || job.invoiceNumber || `INV-${1001 + (filteredJobs.length - 1 - idx)}`;
+                    const invNo = job.invoiceNo || job.invoiceNumber || resolvedJobInvoiceNos[job.id] || '—';
                     return (
                       <tr key={job.id}>
                         <td style={{ fontWeight: 700, color: 'var(--gold-200)' }}>{invNo}</td>

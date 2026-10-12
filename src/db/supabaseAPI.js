@@ -976,36 +976,18 @@ export const supabaseAPI = {
       org_id: orgId
     };
 
-    let resData;
     let { data, error } = await supabase
       .from('soldering_engraving_jobs')
       .insert([rowToInsert])
       .select();
 
     if (error) {
-      delete rowToInsert.invoice_no;
-      const retry1 = await supabase
-        .from('soldering_engraving_jobs')
-        .insert([rowToInsert])
-        .select();
-
-      if (retry1.error) {
-        delete rowToInsert.invoice_number;
-        const retry2 = await supabase
-          .from('soldering_engraving_jobs')
-          .insert([rowToInsert])
-          .select();
-        if (retry2.error) throw retry2.error;
-        resData = retry2.data;
-      } else {
-        resData = retry1.data;
-      }
-    } else {
-      resData = data;
+      console.error("Error saving soldering job with invoice number:", error);
+      throw error;
     }
 
-    const row = ensureRowReturned(resData, 'soldering_engraving_jobs');
-    return { id: row.id, invoiceNo: invNo };
+    const row = ensureRowReturned(data, 'soldering_engraving_jobs');
+    return { id: row.id, invoiceNo: row.invoice_no || row.invoice_number || invNo };
   },
 
   getAllSolderingJobs: async () => {
