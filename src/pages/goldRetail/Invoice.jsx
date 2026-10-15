@@ -538,7 +538,11 @@ const Invoice = () => {
         // Increment and update the next invoice number in settings
         const nextNo = incrementInvoiceNo(actualInvoiceNo);
         if (api?.updateOrganizationSettings) {
-          await api.updateOrganizationSettings(nextNo);
+          try {
+            await api.updateOrganizationSettings(nextNo);
+          } catch (seqErr) {
+            console.warn("Could not update next invoice sequence setting:", seqErr);
+          }
         }
 
         const savedObj = { ...payload, id: res.id, invoiceNo: actualInvoiceNo, invoiceNumber: actualInvoiceNo };

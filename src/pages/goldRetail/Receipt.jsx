@@ -366,7 +366,11 @@ const Receipt = () => {
       if (res?.id) {
         // Increment and save the sequence formatting
         const nextNo = incrementReceiptNo(receiptData.receiptNo);
-        await supabaseAPI.updateOrganizationSettings(undefined, nextNo);
+        try {
+          await supabaseAPI.updateOrganizationSettings(undefined, nextNo);
+        } catch (seqErr) {
+          console.warn("Could not update next receipt sequence setting:", seqErr);
+        }
 
         const savedObj = { ...payload, id: res.id, receiptNo: receiptData.receiptNo, receiptNumber: receiptData.receiptNo };
         setReceipts(prev => [savedObj, ...prev]);

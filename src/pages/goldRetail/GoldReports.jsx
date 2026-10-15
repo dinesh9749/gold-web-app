@@ -384,6 +384,22 @@ export default function GoldReports() {
 
       const assignedNo = inv.invoiceNo || inv.invoiceNumber || (inv.id && masterInvoiceMap[inv.id]) || null;
 
+      // Calculate total gross weight from invoice items
+      let totalGrossWeight = 0;
+      if (Array.isArray(inv.items) && inv.items.length > 0) {
+        inv.items.forEach(it => {
+          const nw = Number(it.netWeight || it.net_weight) || 0;
+          const wp = Number(it.wastagePct || it.wastage_pct) || 0;
+          const sw = Number(it.stoneWeight || it.stone_weight) || 0;
+          const itemGross = it.grossWeight != null && it.grossWeight !== ''
+            ? Number(it.grossWeight)
+            : (it.gross_weight != null && it.gross_weight !== ''
+                ? Number(it.gross_weight)
+                : Math.max(0, nw * (1 + wp / 100) - sw));
+          totalGrossWeight += itemGross;
+        });
+      }
+
       combinedRaw.push({
         id: inv.id || `inv-${idx}`,
         source: 'Invoice',
@@ -393,6 +409,7 @@ export default function GoldReports() {
         rawTime: new Date(rawDate).getTime() || 0,
         customerName: inv.customerName || 'Walk-in Customer',
         hsnSac: extractedHsn || inv.hsnCode || inv.hsn_code || '7113',
+        grossWeight: totalGrossWeight,
         taxableAmount: subtotal,
         gstRateLabel: '3% (1.5% CGST + 1.5% SGST)',
         cgstAmount: cgst,
@@ -421,6 +438,7 @@ export default function GoldReports() {
         rawTime: new Date(rawDate).getTime() || 0,
         customerName: job.customerName || job.customer_name || '—',
         hsnSac: '7113',
+        grossWeight: 0,
         taxableAmount: marking,
         gstRateLabel: '5% (2.5% CGST + 2.5% SGST)',
         cgstAmount: gst / 2,
@@ -465,6 +483,7 @@ export default function GoldReports() {
     let totalSgst = 0;
     let totalGst = 0;
     let totalGrand = 0;
+    let totalGrossWeight = 0;
 
     combinedGstLedger.forEach(item => {
       totalTaxable += item.taxableAmount;
@@ -472,6 +491,7 @@ export default function GoldReports() {
       totalSgst += item.sgstAmount;
       totalGst += item.totalGstAmount;
       totalGrand += item.grandTotal;
+      totalGrossWeight += (item.grossWeight || 0);
     });
 
     return {
@@ -480,7 +500,8 @@ export default function GoldReports() {
       totalCgst,
       totalSgst,
       totalGst,
-      totalGrand
+      totalGrand,
+      totalGrossWeight
     };
   }, [combinedGstLedger]);
 
@@ -493,6 +514,7 @@ export default function GoldReports() {
 
     csvRows.push(['--- GST SUMMARY TOTALS ---']);
     csvRows.push(['Total Tax Invoices Count', gstStats.count]);
+    csvRows.push(['Total Invoiced Gross Weight', `${gstStats.totalGrossWeight.toFixed(3)}g`]);
     csvRows.push(['Total Taxable Value', `₹${gstStats.totalTaxable.toFixed(2)}`]);
     csvRows.push(['Total CGST Collected', `₹${gstStats.totalCgst.toFixed(2)}`]);
     csvRows.push(['Total SGST Collected', `₹${gstStats.totalSgst.toFixed(2)}`]);
@@ -501,7 +523,7 @@ export default function GoldReports() {
     csvRows.push([]);
 
     csvRows.push(['--- DETAILED GST TAX INVOICE LEDGER (ORDERED BY INVOICE NO) ---']);
-    csvRows.push(['Invoice No', 'Date', 'Type', 'HSN/SAC', 'Customer Name', 'Taxable Value (₹)', 'GST Rate', 'CGST (₹)', 'SGST (₹)', 'Total Tax (₹)', 'Invoice Total (₹)']);
+    csvRows.push(['Invoice No', 'Date', 'Type', 'HSN/SAC', 'Customer Name', 'Gross Wt (g)', 'Taxable Value (₹)', 'GST Rate', 'CGST (₹)', 'SGST (₹)', 'Total Tax (₹)', 'Invoice Total (₹)']);
     
     combinedGstLedger.forEach(item => {
       csvRows.push([
@@ -510,6 +532,7 @@ export default function GoldReports() {
         `"${item.typeLabel}"`,
         item.hsnSac,
         `"${item.customerName}"`,
+        item.grossWeight > 0 ? item.grossWeight.toFixed(3) : '',
         `₹${item.taxableAmount.toFixed(2)}`,
         `"${item.gstRateLabel}"`,
         `₹${item.cgstAmount.toFixed(2)}`,
@@ -542,6 +565,7 @@ export default function GoldReports() {
         [],
         ['--- GST SUMMARY TOTALS ---', ''],
         ['Total Tax Invoices Count', gstStats.count],
+        ['Total Gross Weight (g)', Number(gstStats.totalGrossWeight.toFixed(3))],
         ['Total Taxable Value (₹)', Number(gstStats.totalTaxable.toFixed(2))],
         ['Total CGST Collected (₹)', Number(gstStats.totalCgst.toFixed(2))],
         ['Total SGST Collected (₹)', Number(gstStats.totalSgst.toFixed(2))],
@@ -554,6 +578,7 @@ export default function GoldReports() {
           'Document Type',
           'HSN/SAC',
           'Customer Name',
+          'Gross Wt (g)',
           'Taxable Value (₹)',
           'GST Rate',
           'CGST (₹)',
@@ -571,6 +596,7 @@ export default function GoldReports() {
           item.typeLabel,
           item.hsnSac,
           item.customerName,
+          item.grossWeight > 0 ? Number(item.grossWeight.toFixed(3)) : '',
           Number(item.taxableAmount.toFixed(2)),
           item.gstRateLabel,
           Number(item.cgstAmount.toFixed(2)),
@@ -588,6 +614,7 @@ export default function GoldReports() {
         '',
         '',
         '',
+        Number(gstStats.totalGrossWeight.toFixed(3)),
         Number(gstStats.totalTaxable.toFixed(2)),
         '',
         Number(gstStats.totalCgst.toFixed(2)),
@@ -604,6 +631,7 @@ export default function GoldReports() {
         { wch: 24 }, // Document Type
         { wch: 12 }, // HSN/SAC
         { wch: 28 }, // Customer Name
+        { wch: 15 }, // Gross Wt (g)
         { wch: 18 }, // Taxable Value
         { wch: 26 }, // GST Rate
         { wch: 14 }, // CGST
@@ -1420,11 +1448,17 @@ export default function GoldReports() {
                 </div>
 
                 {/* GST KPI Statistics Cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14 }}>
                   <div style={{ padding: 12, borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
                     <div style={{ fontSize: 10, color: 'var(--gold-300)', fontWeight: 700, textTransform: 'uppercase' }}>Tax Invoices Count</div>
                     <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--gold-300)', marginTop: 4 }}>
                       {gstStats.count} Invoices
+                    </div>
+                  </div>
+                  <div style={{ padding: 12, borderRadius: 10, background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)' }}>
+                    <div style={{ fontSize: 10, color: 'var(--gold-200)', fontWeight: 700, textTransform: 'uppercase' }}>Total Gross Weight</div>
+                    <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--gold-200)', marginTop: 4 }}>
+                      {gstStats.totalGrossWeight.toFixed(3)}g
                     </div>
                   </div>
                   <div style={{ padding: 12, borderRadius: 10, background: 'rgba(56,189,248,0.08)', border: '1px solid rgba(56,189,248,0.2)' }}>
@@ -1465,6 +1499,7 @@ export default function GoldReports() {
                         <th style={{ padding: '10px' }}>Document Type</th>
                         <th style={{ padding: '10px' }}>HSN/SAC</th>
                         <th style={{ padding: '10px' }}>Customer Name</th>
+                        <th style={{ padding: '10px', textAlign: 'right' }}>Gross Wt (g)</th>
                         <th style={{ padding: '10px', textAlign: 'right' }}>Taxable Value (₹)</th>
                         <th style={{ padding: '10px', textAlign: 'center' }}>GST Rate</th>
                         <th style={{ padding: '10px', textAlign: 'right' }}>CGST (₹)</th>
@@ -1493,6 +1528,9 @@ export default function GoldReports() {
                           </td>
                           <td style={{ padding: '10px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{item.hsnSac}</td>
                           <td style={{ padding: '10px', fontWeight: 600 }}>{item.customerName}</td>
+                          <td style={{ padding: '10px', textAlign: 'right', fontWeight: 600, color: 'var(--gold-200)' }}>
+                            {item.grossWeight > 0 ? `${item.grossWeight.toFixed(3)}g` : '—'}
+                          </td>
                           <td style={{ padding: '10px', textAlign: 'right', fontWeight: 700 }}>₹{item.taxableAmount.toFixed(2)}</td>
                           <td style={{ padding: '10px', textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>{item.gstRateLabel}</td>
                           <td style={{ padding: '10px', textAlign: 'right' }}>₹{item.cgstAmount.toFixed(2)}</td>
@@ -1503,7 +1541,7 @@ export default function GoldReports() {
                       ))}
                       {combinedGstLedger.length === 0 && (
                         <tr>
-                          <td colSpan="11" style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>
+                          <td colSpan="12" style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)' }}>
                             No tax invoice records found in the selected date range.
                           </td>
                         </tr>
@@ -1519,6 +1557,9 @@ export default function GoldReports() {
                         }}>
                           <td colSpan="5" style={{ padding: '12px 10px', color: 'var(--gold-300)', textAlign: 'right' }}>
                             Grand Total ({gstStats.count} Invoices):
+                          </td>
+                          <td style={{ padding: '12px 10px', textAlign: 'right', color: 'var(--gold-200)' }}>
+                            {gstStats.totalGrossWeight.toFixed(3)}g
                           </td>
                           <td style={{ padding: '12px 10px', textAlign: 'right', color: '#38bdf8' }}>
                             ₹{gstStats.totalTaxable.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

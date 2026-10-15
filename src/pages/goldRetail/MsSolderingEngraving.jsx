@@ -245,7 +245,11 @@ export default function MsSolderingEngraving() {
         const savedInvoiceNo = result.invoiceNo || invoiceNo;
         const nextNo = incrementInvoiceNo(savedInvoiceNo);
         if (api?.updateOrganizationSettings) {
-          await api.updateOrganizationSettings(nextNo);
+          try {
+            await api.updateOrganizationSettings(nextNo);
+          } catch (seqErr) {
+            console.warn("Could not update next invoice sequence setting:", seqErr);
+          }
         }
 
         alert(`Soldering & Engraving Invoice (${savedInvoiceNo}) saved successfully!`);

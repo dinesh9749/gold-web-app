@@ -43,6 +43,8 @@ UPDATE public.organizations SET password = NULL;
 REVOKE ALL ON public.organizations FROM public, anon, authenticated;
 GRANT SELECT (id, name, login_slug, is_active, features, created_at, is_superadmin, next_invoice_number, next_receipt_number) 
   ON public.organizations TO anon, authenticated;
+GRANT UPDATE (next_invoice_number, next_receipt_number) 
+  ON public.organizations TO anon, authenticated;
 
 -- 7. Secure Authentication RPC Function
 CREATE OR REPLACE FUNCTION public.login_organization(p_slug text, p_password text)
